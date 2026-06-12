@@ -784,23 +784,20 @@
   font-weight: 700;
 }
 
-.progressBar {
+.fighterLoader {
   position: relative;
-  height: 7px;
+  width: min(220px, 100%);
+  height: 38px;
   overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
   border-radius: 999px;
-  background: color-mix(in oklch, var(--primary), transparent 86%);
-}
-
-.progressBar::before {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 44%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, transparent, var(--foreground), var(--primary));
-  box-shadow: 0 0 18px color-mix(in oklch, var(--primary), transparent 52%);
-  content: "";
-  animation: progressSweep 1.2s ease-in-out infinite;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.72), transparent 24%, transparent 76%, rgba(0, 0, 0, 0.72)),
+    url("/fighter-loader.gif") center 48% / 92px auto no-repeat,
+    color-mix(in oklch, var(--primary), transparent 90%);
+  box-shadow:
+    inset 0 0 18px rgba(0, 0, 0, 0.28),
+    0 0 18px color-mix(in oklch, var(--primary), transparent 74%);
 }
 
 .composerWrap {
@@ -1055,20 +1052,6 @@
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes progressSweep {
-  0% {
-    transform: translateX(-120%);
-  }
-
-  50% {
-    transform: translateX(88%);
-  }
-
-  100% {
-    transform: translateX(250%);
   }
 }
 

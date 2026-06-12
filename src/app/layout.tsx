@@ -13,8 +13,11 @@ export const metadata: Metadata = {
   description:
     "A Supabase-dark research command interface for scientists, engineers, analysts, and field operators.",
   icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/favicon.ico",
     apple: "/icon.svg",
   },
   openGraph: {

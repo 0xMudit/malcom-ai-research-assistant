@@ -998,7 +998,7 @@ export default function Home() {
                 <span>Malcom</span>
                 <div className={styles.thinking} aria-label="Malcom is working">
                   <strong>Malcom is working</strong>
-                  <div className={styles.progressBar} aria-hidden="true" />
+                  <div className={styles.fighterLoader} aria-hidden="true" />
                 </div>
               </div>
             </article>

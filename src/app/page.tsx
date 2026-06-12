@@ -89,6 +89,16 @@ const starterPrompts = [
 const initialMessages: Message[] = [];
 const chatStorageKey = "malcom.chat.v2";
 const startupAnimationMs = 1800;
+const snippetRotationMs = 30 * 60 * 1000;
+
+const thinkingSnippets = [
+  "Which assumption would embarrass this answer if it were false?",
+  "What evidence would change the strongest opinion in the room?",
+  "Who benefits if this metric is treated as neutral?",
+  "What conclusion are we avoiding because it is inconvenient?",
+  "Which risk sounds dramatic but is actually measurable?",
+  "What would the opposing expert say in one precise sentence?",
+];
 
 function createMessageId() {
   if (globalThis.crypto?.randomUUID) {
@@ -286,6 +296,26 @@ function UserAvatar() {
   );
 }
 
+function getThinkingSnippetIndex() {
+  return (
+    Math.floor(Date.now() / snippetRotationMs) % thinkingSnippets.length
+  );
+}
+
+function FighterLoader() {
+  return (
+    <div className={styles.fighterLoader} aria-hidden="true">
+      <span className={`${styles.fighter} ${styles.fighterLeft}`}>
+        <span />
+      </span>
+      <span className={`${styles.fighter} ${styles.fighterRight}`}>
+        <span />
+      </span>
+      <span className={styles.impact} />
+    </div>
+  );
+}
+
 const MessageItem = memo(function MessageItem({
   message,
   responseState,
@@ -418,6 +448,9 @@ export default function Home() {
   const [accessEmail, setAccessEmail] = useState("");
   const [accessStatus, setAccessStatus] = useState("");
   const [isSubmittingAccess, setIsSubmittingAccess] = useState(false);
+  const [thinkingSnippetIndex, setThinkingSnippetIndex] = useState(() =>
+    getThinkingSnippetIndex(),
+  );
   const [responseStates, setResponseStates] = useState<
     Record<string, ResponseState>
   >({});
@@ -464,6 +497,15 @@ export default function Home() {
 
   useEffect(() => {
     void refreshStats();
+  }, []);
+
+  useEffect(() => {
+    const syncSnippet = () => setThinkingSnippetIndex(getThinkingSnippetIndex());
+    const timer = window.setInterval(syncSnippet, 60_000);
+
+    syncSnippet();
+
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -998,7 +1040,8 @@ export default function Home() {
                 <span>Malcom</span>
                 <div className={styles.thinking} aria-label="Malcom is working">
                   <strong>Malcom is working</strong>
-                  <div className={styles.fighterLoader} aria-hidden="true" />
+                  <FighterLoader />
+                  <p>{thinkingSnippets[thinkingSnippetIndex]}</p>
                 </div>
               </div>
             </article>

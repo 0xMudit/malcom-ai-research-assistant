@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Response action was not saved." }, { status: 400 });
   }
 
-  saveResponseFeedback({
+  await saveResponseFeedback({
     id: crypto.randomUUID(),
     messageId,
     reaction,

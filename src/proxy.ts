@@ -1,8 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const adminUser = process.env.MALCOM_ADMIN_USER || "admin";
-const adminPassword = process.env.MALCOM_ADMIN_PASSWORD || "MalcomAdmin2026!";
+const adminUser =
+  process.env.MALCOM_ADMIN_USER ||
+  (process.env.NODE_ENV === "production" ? "" : "admin");
+const adminPassword =
+  process.env.MALCOM_ADMIN_PASSWORD ||
+  (process.env.NODE_ENV === "production" ? "" : "MalcomAdmin2026!");
 
 function unauthorized() {
   return new NextResponse("Authentication required.", {
@@ -14,6 +18,12 @@ function unauthorized() {
 }
 
 export function proxy(request: NextRequest) {
+  if (!adminUser || !adminPassword) {
+    return new NextResponse("Admin credentials are not configured.", {
+      status: 503,
+    });
+  }
+
   const header = request.headers.get("authorization");
 
   if (!header?.startsWith("Basic ")) {

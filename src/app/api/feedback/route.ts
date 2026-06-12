@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     );
   }
 
-  saveFeedback({
+  await saveFeedback({
     id: crypto.randomUUID(),
     ...feedbackInput,
     userAgent: request.headers.get("user-agent")?.slice(0, 300) || "unknown",

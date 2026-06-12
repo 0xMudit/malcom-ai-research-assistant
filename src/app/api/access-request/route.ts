@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     );
   }
 
-  saveAccessRequest({
+  await saveAccessRequest({
     id: crypto.randomUUID(),
     ...accessRequest,
     userAgent: request.headers.get("user-agent")?.slice(0, 300) || "unknown",

@@ -5,8 +5,10 @@ import {
   getRecentResponseFeedback,
   getRecentSessions,
   getStats,
+  updateAccessRequestStatus,
 } from "@/lib/database";
 import type { Metadata } from "next";
+import { revalidatePath } from "next/cache";
 import styles from "./page.module.css";
 
 export const runtime = "nodejs";
@@ -17,13 +19,39 @@ export const metadata: Metadata = {
   description: "Review access requests, feedback, chats, and response actions.",
 };
 
-export default function AdminPage() {
-  const stats = getStats();
-  const feedback = getRecentFeedback();
-  const accessRequests = getRecentAccessRequests();
-  const responseActions = getRecentResponseFeedback();
-  const sessions = getRecentSessions();
-  const messages = getRecentMessages();
+async function setAccessStatus(formData: FormData) {
+  "use server";
+
+  const id = String(formData.get("id") || "");
+  const status = String(formData.get("status") || "");
+
+  if (
+    !id ||
+    (status !== "pending" && status !== "approved" && status !== "rejected")
+  ) {
+    return;
+  }
+
+  await updateAccessRequestStatus({ id, status });
+  revalidatePath("/admin");
+}
+
+export default async function AdminPage() {
+  const [
+    stats,
+    feedback,
+    accessRequests,
+    responseActions,
+    sessions,
+    messages,
+  ] = await Promise.all([
+    getStats(),
+    getRecentFeedback(),
+    getRecentAccessRequests(),
+    getRecentResponseFeedback(),
+    getRecentSessions(),
+    getRecentMessages(),
+  ]);
 
   return (
     <main className={styles.admin}>
@@ -73,6 +101,7 @@ export default function AdminPage() {
                   <th>Email</th>
                   <th>Status</th>
                   <th>Created</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -85,11 +114,40 @@ export default function AdminPage() {
                         <span className={styles.status}>{request.status}</span>
                       </td>
                       <td>{request.created_at}</td>
+                      <td>
+                        <form className={styles.actions} action={setAccessStatus}>
+                          <input type="hidden" name="id" value={request.id} />
+                          <button
+                            type="submit"
+                            name="status"
+                            value="approved"
+                            disabled={request.status === "approved"}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="submit"
+                            name="status"
+                            value="rejected"
+                            disabled={request.status === "rejected"}
+                          >
+                            Reject
+                          </button>
+                          <button
+                            type="submit"
+                            name="status"
+                            value="pending"
+                            disabled={request.status === "pending"}
+                          >
+                            Reset
+                          </button>
+                        </form>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4}>No access requests yet.</td>
+                    <td colSpan={5}>No access requests yet.</td>
                   </tr>
                 )}
               </tbody>

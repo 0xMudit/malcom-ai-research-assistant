@@ -11,6 +11,7 @@ const BASE_URL = (
   .replace(/\/v1\/?$/, "")
   .replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = 60_000;
+const MAX_DOCUMENT_CONTEXT_CHARS = 16_000;
 
 export const runtime = "nodejs";
 
@@ -76,6 +77,41 @@ function readMessages(body: unknown) {
   ];
 }
 
+function readDocumentContext(body: unknown) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return "";
+  }
+
+  const documentContexts = (body as Record<string, unknown>).documentContexts;
+
+  if (!Array.isArray(documentContexts)) {
+    return "";
+  }
+
+  const context = documentContexts
+    .slice(0, 5)
+    .map((document, index) => {
+      if (!document || typeof document !== "object" || Array.isArray(document)) {
+        return "";
+      }
+
+      const item = document as Record<string, unknown>;
+      const name = cleanText(item.name).slice(0, 180) || `Document ${index + 1}`;
+      const content = cleanText(item.content).slice(0, 5000);
+
+      if (!content) {
+        return "";
+      }
+
+      return `Document: ${name}\n${content}`;
+    })
+    .filter(Boolean)
+    .join("\n\n---\n\n")
+    .slice(0, MAX_DOCUMENT_CONTEXT_CHARS);
+
+  return context;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null);
@@ -88,6 +124,7 @@ export async function POST(request: Request) {
       typeof (body as Record<string, unknown>).profileMemory === "string"
         ? cleanText((body as Record<string, unknown>).profileMemory).slice(0, 4000)
         : "";
+    const documentContext = readDocumentContext(body);
 
     if (messages.length === 0) {
       return NextResponse.json(
@@ -156,6 +193,9 @@ export async function POST(request: Request) {
                   "Do not provide instructions for violence, weapons, physical harm, or evading safety controls.",
                   profileMemory
                     ? `User profile memory: ${profileMemory}`
+                    : "",
+                  documentContext
+                    ? `Use the attached document context when it is relevant. Cite document names in the answer when making claims from them. Attached document context:\n${documentContext}`
                     : "",
                 ].join(" "),
             },

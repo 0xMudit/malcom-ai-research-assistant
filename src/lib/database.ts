@@ -94,6 +94,17 @@ export type UserProfile = {
   updated_at: string;
 };
 
+export type StoredDocument = {
+  id: string;
+  user_id: string;
+  name: string;
+  mime_type: string;
+  size: number;
+  content: string;
+  summary: string;
+  created_at: string;
+};
+
 function getDb() {
   if (db) {
     return db;
@@ -179,6 +190,20 @@ function getDb() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS documents (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT '',
+      size INTEGER NOT NULL DEFAULT 0,
+      content TEXT NOT NULL,
+      summary TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS documents_user_id_created_at_idx
+      ON documents (user_id, created_at DESC);
   `);
 
   const sessionColumns = db
@@ -1084,4 +1109,110 @@ export async function getRandomSexualHealthFacts(
        LIMIT ?`,
     )
     .all(safeLimit) as SexualHealthFact[];
+}
+
+export async function saveDocument(input: {
+  id: string;
+  userId: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  content: string;
+  summary: string;
+}) {
+  const document = {
+    id: input.id,
+    user_id: input.userId,
+    name: input.name.slice(0, 180).trim() || "Untitled document",
+    mime_type: input.mimeType.slice(0, 120),
+    size: Math.max(0, input.size),
+    content: input.content,
+    summary: input.summary,
+  };
+
+  if (shouldUseSupabase()) {
+    try {
+      const { error } = await createSupabaseAdminClient()
+        .from("documents")
+        .upsert(document, { onConflict: "id" });
+
+      throwOnSupabaseError(error);
+      return;
+    } catch (error) {
+      reportSupabaseError("saveDocument", error);
+    }
+  }
+
+  getDb()
+    .prepare(
+      `INSERT INTO documents (id, user_id, name, mime_type, size, content, summary)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name,
+         mime_type = excluded.mime_type,
+         size = excluded.size,
+         content = excluded.content,
+         summary = excluded.summary`,
+    )
+    .run(
+      document.id,
+      document.user_id,
+      document.name,
+      document.mime_type,
+      document.size,
+      document.content,
+      document.summary,
+    );
+}
+
+export async function getUserDocuments(
+  userId: string,
+  limit = 40,
+): Promise<StoredDocument[]> {
+  if (shouldUseSupabase()) {
+    try {
+      const { data, error } = await createSupabaseAdminClient()
+        .from("documents")
+        .select("id, user_id, name, mime_type, size, content, summary, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      throwOnSupabaseError(error);
+      return (data || []) as StoredDocument[];
+    } catch (error) {
+      reportSupabaseError("getUserDocuments", error);
+    }
+  }
+
+  return getDb()
+    .prepare(
+      `SELECT id, user_id, name, mime_type, size, content, summary, created_at
+       FROM documents
+       WHERE user_id = ?
+       ORDER BY created_at DESC
+       LIMIT ?`,
+    )
+    .all(userId, limit) as StoredDocument[];
+}
+
+export async function deleteUserDocument(userId: string, documentId: string) {
+  if (shouldUseSupabase()) {
+    try {
+      const { error } = await createSupabaseAdminClient()
+        .from("documents")
+        .delete()
+        .eq("id", documentId)
+        .eq("user_id", userId);
+
+      throwOnSupabaseError(error);
+      return;
+    } catch (error) {
+      reportSupabaseError("deleteUserDocument", error);
+    }
+  }
+
+  getDb()
+    .prepare("DELETE FROM documents WHERE id = ? AND user_id = ?")
+    .run(documentId, userId);
 }

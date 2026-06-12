@@ -9,6 +9,7 @@ import {
   CircleUserRound,
   Copy,
   Edit3,
+  FileText,
   HardDrive,
   LogIn,
   MessageSquareText,
@@ -26,6 +27,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   Trash2,
+  UploadCloud,
   UserRound,
   X,
 } from "lucide-react";
@@ -79,6 +81,16 @@ type StarredResponse = {
 type UserProfile = {
   display_name: string;
   memory: string;
+};
+
+type DocumentResource = {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  content: string;
+  summary: string;
+  createdAt: string;
 };
 
 type AppStats = {
@@ -192,6 +204,7 @@ const initialMessages: Message[] = [];
 const chatStorageKey = "malcom.chat.v2";
 const guestSessionsKey = "malcom.guest.sessions.v1";
 const guestStarsKey = "malcom.guest.stars.v1";
+const guestDocumentsKey = "malcom.guest.documents.v1";
 const startupAnimationMs = 1800;
 const factRotationMs = 5000;
 const authEmailRedirectTo =
@@ -522,6 +535,18 @@ function getRandomStarterPrompts(count = 4) {
     .slice(0, count);
 }
 
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 KB";
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 const MessageItem = memo(function MessageItem({
   message,
   responseState,
@@ -707,8 +732,13 @@ export default function Home() {
   const [editingTitle, setEditingTitle] = useState("");
   const [editingFolder, setEditingFolder] = useState("");
   const [editingTags, setEditingTags] = useState("");
+  const [documents, setDocuments] = useState<DocumentResource[]>([]);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [documentStatus, setDocumentStatus] = useState("");
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const requestTokenRef = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -750,6 +780,13 @@ export default function Home() {
     () => messages.length === 0 && input.trim().length === 0,
     [input, messages.length],
   );
+  const selectedDocuments = useMemo(
+    () =>
+      selectedDocumentIds
+        .map((id) => documents.find((document) => document.id === id))
+        .filter((document): document is DocumentResource => Boolean(document)),
+    [documents, selectedDocumentIds],
+  );
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 760px)");
@@ -764,6 +801,7 @@ export default function Home() {
       setMessages(stored.messages);
       setGuestSessions(readJsonArray(guestSessionsKey));
       setStarredResponses(readJsonArray(guestStarsKey));
+      setDocuments(readJsonArray<DocumentResource>(guestDocumentsKey));
       setHasLoadedStoredChat(true);
       setStarterPrompts(getRandomStarterPrompts());
     }, 0);
@@ -814,10 +852,19 @@ export default function Home() {
     }
 
     void refreshUserWorkspace(accessToken);
+    void refreshDocuments(accessToken);
     void syncGuestStars(accessToken);
     // refreshUserWorkspace is intentionally read from the latest render here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser, accessToken]);
+
+  useEffect(() => {
+    if (!hasLoadedStoredChat || authUser) {
+      return;
+    }
+
+    writeJsonArray(guestDocumentsKey, documents.slice(0, 20));
+  }, [authUser, documents, hasLoadedStoredChat]);
 
   useEffect(() => {
     if (!hasLoadedStoredChat) {
@@ -960,6 +1007,101 @@ export default function Home() {
           ? caughtError.message
           : "Could not load account history.",
       );
+    }
+  }
+
+  async function refreshDocuments(token = accessToken) {
+    if (!token) {
+      setDocuments(readJsonArray<DocumentResource>(guestDocumentsKey));
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/documents", {
+        cache: "no-store",
+        headers: authHeaders(token),
+      });
+      const data = (await response.json()) as {
+        documents?: DocumentResource[];
+      };
+
+      if (response.ok) {
+        setDocuments(data.documents || []);
+      }
+    } catch {
+      setDocumentStatus("Could not load documents.");
+    }
+  }
+
+  async function uploadDocument(file: File) {
+    setDocumentStatus("");
+    setIsUploadingDocument(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/documents", {
+        method: "POST",
+        headers: authHeaders(),
+        body: formData,
+      });
+      const data = (await response.json()) as {
+        document?: DocumentResource;
+        error?: string;
+      };
+
+      if (!response.ok || !data.document) {
+        throw new Error(data.error || "Document was not uploaded.");
+      }
+
+      setDocuments((current) => [
+        data.document as DocumentResource,
+        ...current.filter((document) => document.id !== data.document?.id),
+      ]);
+      setSelectedDocumentIds((current) => [
+        data.document!.id,
+        ...current.filter((id) => id !== data.document!.id),
+      ].slice(0, 5));
+      setDocumentStatus("Document ready for chat.");
+    } catch (caughtError) {
+      setDocumentStatus(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Document was not uploaded.",
+      );
+    } finally {
+      setIsUploadingDocument(false);
+
+      if (documentInputRef.current) {
+        documentInputRef.current.value = "";
+      }
+    }
+  }
+
+  function toggleSelectedDocument(id: string) {
+    setSelectedDocumentIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [id, ...current].slice(0, 5),
+    );
+  }
+
+  async function deleteDocument(id: string) {
+    setDocuments((current) => current.filter((document) => document.id !== id));
+    setSelectedDocumentIds((current) => current.filter((item) => item !== id));
+
+    if (!accessToken) {
+      return;
+    }
+
+    try {
+      await fetch(`/api/documents?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+    } catch {
+      setDocumentStatus("Document was removed locally, but server delete failed.");
     }
   }
 
@@ -1148,8 +1290,11 @@ export default function Home() {
     window.localStorage.removeItem(chatStorageKey);
     window.localStorage.removeItem(guestSessionsKey);
     window.localStorage.removeItem(guestStarsKey);
+    window.localStorage.removeItem(guestDocumentsKey);
     setGuestSessions([]);
     setStarredResponses([]);
+    setDocuments([]);
+    setSelectedDocumentIds([]);
     startNewChat();
   }
 
@@ -1244,6 +1389,8 @@ export default function Home() {
     setAccessToken("");
     setSavedSessions([]);
     setStarredResponses(readJsonArray(guestStarsKey));
+    setDocuments(readJsonArray<DocumentResource>(guestDocumentsKey));
+    setSelectedDocumentIds([]);
     setProfile({ display_name: "", memory: "" });
     setProfileOpen(false);
   }
@@ -1310,6 +1457,10 @@ export default function Home() {
         body: JSON.stringify({
           sessionId,
           profileMemory: authUser ? profile.memory : "",
+          documentContexts: selectedDocuments.map((document) => ({
+            name: document.name,
+            content: document.content,
+          })),
           messages: pendingMessages.map(({ id, role, content }) => ({
             id,
             role,
@@ -1848,6 +1999,76 @@ export default function Home() {
 
           <section className={styles.navSection}>
             <div className={styles.navSectionHeader}>
+              <FileText size={13} aria-hidden="true" />
+              <h2>Documents</h2>
+              <span>{documents.length}</span>
+            </div>
+            <input
+              ref={documentInputRef}
+              className={styles.fileInput}
+              type="file"
+              accept=".txt,.md,.csv,.json,.js,.jsx,.ts,.tsx,.py,.sql,.html,.css,.xml,.yaml,.yml,.log,text/*,application/json"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+
+                if (file) {
+                  void uploadDocument(file);
+                }
+              }}
+            />
+            <button
+              className={styles.uploadButton}
+              type="button"
+              onClick={() => documentInputRef.current?.click()}
+              disabled={isUploadingDocument}
+            >
+              <UploadCloud size={14} />
+              <span>{isUploadingDocument ? "Uploading" : "Upload file"}</span>
+            </button>
+            {documentStatus ? (
+              <p className={styles.emptyNavText}>{documentStatus}</p>
+            ) : null}
+            <div className={styles.documentList}>
+              {documents.length ? (
+                documents.slice(0, 8).map((document) => {
+                  const selected = selectedDocumentIds.includes(document.id);
+
+                  return (
+                    <article
+                      key={document.id}
+                      className={`${styles.documentRow} ${
+                        selected ? styles.documentSelected : ""
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleSelectedDocument(document.id)}
+                        aria-pressed={selected}
+                      >
+                        <span>{document.name}</span>
+                        <time>{formatBytes(document.size)}</time>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteDocument(document.id)}
+                        aria-label={`Delete ${document.name}`}
+                        title="Delete"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </article>
+                  );
+                })
+              ) : (
+                <p className={styles.emptyNavText}>
+                  Upload text, Markdown, CSV, JSON, code, or logs.
+                </p>
+              )}
+            </div>
+          </section>
+
+          <section className={styles.navSection}>
+            <div className={styles.navSectionHeader}>
               <Pin size={13} aria-hidden="true" />
               <h2>Pinned</h2>
               <span>{pinnedSessions.length}</span>
@@ -2138,6 +2359,23 @@ export default function Home() {
         </div>
 
         <div className={styles.composerWrap}>
+          {selectedDocuments.length ? (
+            <div className={styles.attachmentStrip} aria-label="Attached documents">
+              {selectedDocuments.map((document) => (
+                <button
+                  key={document.id}
+                  type="button"
+                  onClick={() => toggleSelectedDocument(document.id)}
+                  title="Remove document context"
+                >
+                  <FileText size={14} />
+                  <span>{document.name}</span>
+                  <X size={13} />
+                </button>
+              ))}
+            </div>
+          ) : null}
+
           {error ? (
             <p className={styles.error}>
               <AlertCircle size={16} />

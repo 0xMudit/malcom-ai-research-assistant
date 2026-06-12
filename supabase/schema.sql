@@ -68,6 +68,17 @@ create table if not exists public.user_profiles (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.documents (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  mime_type text not null default '',
+  size integer not null default 0,
+  content text not null,
+  summary text not null default '',
+  created_at timestamptz not null default now()
+);
+
 alter table public.chat_sessions
   add column if not exists user_id uuid references auth.users(id) on delete cascade;
 
@@ -104,6 +115,9 @@ create index if not exists access_requests_created_at_idx
 create index if not exists starred_responses_user_id_created_at_idx
   on public.starred_responses (user_id, created_at desc);
 
+create index if not exists documents_user_id_created_at_idx
+  on public.documents (user_id, created_at desc);
+
 alter table public.chat_sessions enable row level security;
 alter table public.chat_messages enable row level security;
 alter table public.feedback enable row level security;
@@ -112,3 +126,4 @@ alter table public.access_requests enable row level security;
 alter table public.sexual_health_facts enable row level security;
 alter table public.starred_responses enable row level security;
 alter table public.user_profiles enable row level security;
+alter table public.documents enable row level security;

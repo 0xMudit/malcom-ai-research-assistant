@@ -638,7 +638,7 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState("");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isStarting, setIsStarting] = useState(true);
   const [hasLoadedStoredChat, setHasLoadedStoredChat] = useState(false);
   const [stats, setStats] = useState<AppStats>({
@@ -742,6 +742,12 @@ export default function Home() {
   );
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 760px)");
+    const syncSidebar = () => setSidebarCollapsed(mediaQuery.matches);
+
+    syncSidebar();
+    mediaQuery.addEventListener("change", syncSidebar);
+
     const loadTimer = window.setTimeout(() => {
       const stored = loadStoredChat();
       setSessionId(stored.sessionId);
@@ -758,6 +764,7 @@ export default function Home() {
     );
 
     return () => {
+      mediaQuery.removeEventListener("change", syncSidebar);
       window.clearTimeout(loadTimer);
       window.clearTimeout(startupTimer);
     };

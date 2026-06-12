@@ -6,8 +6,8 @@
   overflow: hidden;
   color: var(--foreground);
   background:
-    radial-gradient(circle at 74% 10%, rgba(45, 212, 146, 0.12), transparent 25%),
-    radial-gradient(circle at 20% 80%, rgba(16, 185, 129, 0.08), transparent 30%),
+    linear-gradient(135deg, rgba(48, 68, 115, 0.18), transparent 42%),
+    radial-gradient(circle at 84% 12%, color-mix(in oklch, var(--primary), transparent 88%), transparent 24%),
     var(--background);
   transition: grid-template-columns 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -24,7 +24,7 @@
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(circle at 50% 45%, rgba(45, 212, 146, 0.12), transparent 32%),
+    radial-gradient(circle at 50% 45%, color-mix(in oklch, var(--primary), transparent 88%), transparent 32%),
     var(--background);
   animation: startupExit 1.8s ease forwards;
 }
@@ -90,6 +90,7 @@
   padding: 14px;
   border-right: 1px solid var(--sidebar-border);
   background: var(--sidebar);
+  box-shadow: 14px 0 38px rgba(0, 0, 0, 0.16);
   transition:
     padding 220ms ease,
     background 220ms ease,
@@ -254,6 +255,19 @@
     color 180ms ease,
     transform 180ms ease,
     box-shadow 180ms ease;
+}
+
+.primaryButton:focus-visible,
+.iconButton:focus-visible,
+.feedbackButton:focus-visible,
+.loginButton:focus-visible,
+.composer button:focus-visible,
+.suggestions button:focus-visible,
+.codeBlock button:focus-visible,
+.responseActions button:focus-visible,
+.responseComment button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 .primaryButton,
@@ -575,7 +589,7 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 30px clamp(16px, 5vw, 88px) 132px;
+  padding: 30px clamp(16px, 5vw, 88px) 144px;
   scrollbar-gutter: stable;
   scroll-behavior: smooth;
 }
@@ -656,7 +670,7 @@
   background: var(--card);
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 10px 26px rgba(74, 54, 30, 0.08);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
 }
 
 .suggestions button span {
@@ -1053,7 +1067,7 @@
 .composerWrap {
   position: absolute;
   right: 0;
-  bottom: 18px;
+  bottom: 20px;
   left: 0;
   z-index: 5;
   display: grid;
@@ -1092,7 +1106,7 @@
   padding: 10px;
   border: 1px solid color-mix(in oklch, var(--input), transparent 16%);
   border-radius: 18px;
-  background: color-mix(in oklch, var(--card), transparent 6%);
+  background: color-mix(in oklch, var(--card), transparent 3%);
   box-shadow:
     0 26px 80px rgba(0, 0, 0, 0.46),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -1116,6 +1130,7 @@
   background: transparent;
   font: inherit;
   line-height: 1.45;
+  scrollbar-width: thin;
 }
 
 .composer textarea::placeholder {
@@ -1142,7 +1157,7 @@
   display: grid;
   place-items: center;
   padding: 18px;
-  background: rgba(18, 10, 4, 0.72);
+  background: rgba(6, 10, 20, 0.74);
   backdrop-filter: blur(12px);
 }
 
@@ -1413,7 +1428,7 @@
   }
 
   .shell:not(.shellCollapsed) {
-    grid-template-columns: minmax(220px, 42vw) minmax(0, 1fr);
+    grid-template-columns: minmax(236px, 48vw) minmax(0, 1fr);
   }
 
   .sidebar {
@@ -1445,17 +1460,71 @@
   }
 }
 
+@media (max-width: 760px) {
+  .shell,
+  .shellCollapsed,
+  .shell:not(.shellCollapsed) {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 10px;
+    bottom: auto;
+    left: 10px;
+    z-index: 8;
+    width: 48px;
+    max-height: calc(100dvh - 20px);
+    padding: 6px;
+    border: 1px solid var(--sidebar-border);
+    border-radius: 14px;
+    background: color-mix(in oklch, var(--sidebar), transparent 3%);
+    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.34);
+  }
+
+  .shell:not(.shellCollapsed) .sidebar {
+    width: min(300px, calc(100vw - 20px));
+    padding: 10px;
+  }
+
+  .shellCollapsed .brand,
+  .shellCollapsed .primaryButton,
+  .shellCollapsed .iconButton,
+  .shellCollapsed .loginButton,
+  .shellCollapsed .feedbackButton {
+    width: 34px;
+    min-height: 34px;
+  }
+
+  .shell:not(.shellCollapsed)::before {
+    position: fixed;
+    inset: 0;
+    z-index: 7;
+    background: rgba(6, 10, 20, 0.46);
+    content: "";
+  }
+
+  .chat {
+    grid-column: 1;
+  }
+
+  .thread {
+    padding-top: 76px;
+  }
+}
+
 @media (max-width: 640px) {
   .iconButton span {
     display: none;
   }
 
   .thread {
-    padding: 20px 14px 118px;
+    padding: 76px 14px 126px;
   }
 
   .emptyState {
-    min-height: min(500px, 64dvh);
+    min-height: min(500px, 58dvh);
+    padding-top: 8px;
   }
 
   .emptyState h2 {
@@ -1494,12 +1563,13 @@
   }
 
   .composer {
-    grid-template-columns: minmax(0, 1fr) 46px;
+    grid-template-columns: minmax(0, 1fr) 44px;
     gap: 8px;
   }
 
   .composer button {
-    min-width: 46px;
+    min-width: 44px;
+    min-height: 44px;
     padding: 0;
   }
 
@@ -1509,22 +1579,16 @@
 }
 
 @media (max-width: 420px) {
-  .shell,
-  .shellCollapsed {
-    grid-template-columns: 52px minmax(0, 1fr);
-  }
-
   .sidebar {
     gap: 10px;
-    padding: 9px 6px;
-  }
-
-  .shell:not(.shellCollapsed) {
-    grid-template-columns: minmax(190px, 70vw) minmax(0, 1fr);
+    top: 8px;
+    left: 8px;
+    width: 46px;
+    padding: 5px;
   }
 
   .thread {
-    padding: 16px 10px 112px;
+    padding: 72px 10px 118px;
   }
 
   .emptyState {

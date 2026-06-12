@@ -1,43 +1,30 @@
 # Malcom
 
-Malcom is a dark, clean Next.js chat UI for a local OpenAI-compatible model server.
+Malcom is a dark research command interface for scientists, engineers, intelligence analysts, field operators, and researchers.
 
-## Local Model
+## Engine
 
-The app is configured for a tiny local test model:
-
-```txt
-HuggingFaceTB/SmolLM2-135M-Instruct
-```
-
-By default Malcom calls:
+The app is configured for this model:
 
 ```txt
-http://localhost:1234/v1/chat/completions
+hf.co/HauhauCS/Qwen3.5-2B-Uncensored-HauhauCS-Aggressive:latest
 ```
 
-Use LM Studio, vLLM, llama.cpp server, or another OpenAI-compatible runtime that can serve the model at that endpoint.
-
-When you want the larger model again, set `MALCOM_MODEL` to:
+By default Malcom calls the chat engine endpoint at:
 
 ```txt
-HauhauCS/Gemma4-26B-A4B-Uncensored-HauhauCS-Balanced
+http://127.0.0.1:11434/api/chat
 ```
+
+The server route requests normal visible responses. The UI shows a concise "How Malcom is working" panel while an answer is being prepared.
 
 ## Configure
-
-Copy the example environment file if you need different settings:
-
-```bash
-cp .env.local.example .env.local
-```
 
 Available settings:
 
 ```txt
-MALCOM_MODEL=HuggingFaceTB/SmolLM2-135M-Instruct
-MALCOM_LLM_BASE_URL=http://localhost:1234/v1
-MALCOM_LLM_API_KEY=not-needed
+MALCOM_MODEL=hf.co/HauhauCS/Qwen3.5-2B-Uncensored-HauhauCS-Aggressive:latest
+MALCOM_LLM_BASE_URL=http://127.0.0.1:11434
 ```
 
 ## Run
@@ -48,7 +35,7 @@ Install dependencies if needed:
 npm install
 ```
 
-Start your local model server, then run:
+Start the chat engine, then run:
 
 ```bash
 npm run dev
@@ -57,5 +44,5 @@ npm run dev
 Open:
 
 ```txt
-http://localhost:3000
+http://127.0.0.1:3000
 ```

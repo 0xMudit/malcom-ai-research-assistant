@@ -3,22 +3,30 @@
 import {
   AlertCircle,
   BarChart3,
+  BookMarked,
   BrainCircuit,
   Check,
   CircleUserRound,
   Copy,
+  Edit3,
+  HardDrive,
   LogIn,
   MessageSquareText,
   MessageSquareHeart,
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
+  Pin,
+  PinOff,
   RefreshCcw,
+  Search,
   SendHorizontal,
   Sparkles,
   Star,
   ThumbsDown,
   ThumbsUp,
+  Trash2,
+  UserRound,
   X,
 } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -1771,8 +1779,14 @@ export default function Home() {
 
         <div className={styles.accountPanel} aria-label="Account history">
           {!authUser ? (
-            <div>
-              <span>Guest workspace</span>
+            <div className={styles.workspaceCard}>
+              <div className={styles.workspaceIcon} aria-hidden="true">
+                <HardDrive size={17} />
+              </div>
+              <div>
+                <span>Guest workspace</span>
+                <p>Stored on this device</p>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -1780,17 +1794,29 @@ export default function Home() {
                   setAuthOpen(true);
                 }}
               >
-                Create account
+                Sign up
               </button>
             </div>
           ) : (
-            <div className={styles.historyHeader}>
-              <span>{profile.display_name || "History"}</span>
+            <div className={styles.workspaceCard}>
+              <div className={styles.workspaceIcon} aria-hidden="true">
+                <UserRound size={17} />
+              </div>
+              <div>
+                <span>{profile.display_name || authUser.email || "Workspace"}</span>
+                <p>Synced account</p>
+              </div>
               <button type="button" onClick={() => setProfileOpen(true)}>
                 Profile
               </button>
-              <button type="button" onClick={() => void refreshUserWorkspace()}>
-                Refresh
+              <button
+                className={styles.iconMiniButton}
+                type="button"
+                onClick={() => void refreshUserWorkspace()}
+                aria-label="Refresh workspace"
+                title="Refresh"
+              >
+                <RefreshCcw size={13} />
               </button>
             </div>
           )}
@@ -1812,71 +1838,119 @@ export default function Home() {
           ) : null}
 
           <label className={styles.historySearch}>
-            <span>Search</span>
+            <Search size={14} aria-hidden="true" />
             <input
               value={historyQuery}
               onChange={(event) => setHistoryQuery(event.target.value)}
-              placeholder="Chats, folders, tags"
+              placeholder="Search chats, folders, tags"
             />
           </label>
 
-          <section>
-            <h2>Pinned</h2>
+          <section className={styles.navSection}>
+            <div className={styles.navSectionHeader}>
+              <Pin size={13} aria-hidden="true" />
+              <h2>Pinned</h2>
+              <span>{pinnedSessions.length}</span>
+            </div>
             <div className={styles.historyList}>
               {pinnedSessions.length ? (
                 pinnedSessions.slice(0, 5).map((session) => (
                   <article key={session.id} className={styles.sessionRow}>
-                    <button type="button" onClick={() => void openSavedChat(session.id)}>
+                    <button
+                      className={styles.sessionOpenButton}
+                      type="button"
+                      onClick={() => void openSavedChat(session.id)}
+                    >
                       <span>{session.title}</span>
                       <time>{session.folder || session.tags || "Pinned"}</time>
                     </button>
-                    <div>
-                      <button type="button" onClick={() => void togglePinnedSession(session)}>
-                        Unpin
+                    <div className={styles.sessionActions}>
+                      <button
+                        type="button"
+                        onClick={() => void togglePinnedSession(session)}
+                        aria-label={`Unpin ${session.title}`}
+                        title="Unpin"
+                      >
+                        <PinOff size={13} />
                       </button>
-                      <button type="button" onClick={() => beginEditSession(session)}>
-                        Edit
+                      <button
+                        type="button"
+                        onClick={() => beginEditSession(session)}
+                        aria-label={`Edit ${session.title}`}
+                        title="Edit"
+                      >
+                        <Edit3 size={13} />
                       </button>
-                      <button type="button" onClick={() => void deleteSession(session.id)}>
-                        Delete
+                      <button
+                        type="button"
+                        onClick={() => void deleteSession(session.id)}
+                        aria-label={`Delete ${session.title}`}
+                        title="Delete"
+                      >
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   </article>
                 ))
               ) : (
-                <p>No pinned chats.</p>
+                <p className={styles.emptyNavText}>No pinned chats.</p>
               )}
             </div>
           </section>
 
-          <section>
-            <h2>{authUser ? "Saved chats" : "Guest chats"}</h2>
+          <section className={styles.navSection}>
+            <div className={styles.navSectionHeader}>
+              <MessageSquareText size={13} aria-hidden="true" />
+              <h2>{authUser ? "Saved chats" : "Guest chats"}</h2>
+              <span>{unpinnedSessions.length}</span>
+            </div>
             <div className={styles.historyList}>
               {unpinnedSessions.length ? (
                 unpinnedSessions.slice(0, 10).map((session) => (
                   <article key={session.id} className={styles.sessionRow}>
-                    <button type="button" onClick={() => void openSavedChat(session.id)}>
+                    <button
+                      className={styles.sessionOpenButton}
+                      type="button"
+                      onClick={() => void openSavedChat(session.id)}
+                    >
                       <span>{session.title}</span>
                       <time>
                         {[session.folder, session.tags].filter(Boolean).join(" / ") ||
                           new Date(session.updated_at).toLocaleDateString()}
                       </time>
                     </button>
-                    <div>
-                      <button type="button" onClick={() => void togglePinnedSession(session)}>
-                        Pin
+                    <div className={styles.sessionActions}>
+                      <button
+                        type="button"
+                        onClick={() => void togglePinnedSession(session)}
+                        aria-label={`Pin ${session.title}`}
+                        title="Pin"
+                      >
+                        <Pin size={13} />
                       </button>
-                      <button type="button" onClick={() => beginEditSession(session)}>
-                        Edit
+                      <button
+                        type="button"
+                        onClick={() => beginEditSession(session)}
+                        aria-label={`Edit ${session.title}`}
+                        title="Edit"
+                      >
+                        <Edit3 size={13} />
                       </button>
-                      <button type="button" onClick={() => void deleteSession(session.id)}>
-                        Delete
+                      <button
+                        type="button"
+                        onClick={() => void deleteSession(session.id)}
+                        aria-label={`Delete ${session.title}`}
+                        title="Delete"
+                      >
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   </article>
                 ))
               ) : (
-                <p>{authUser ? "No saved chats yet." : "No guest chats yet."}</p>
+                <p className={styles.emptyNavText}>
+                  {authUser ? "No saved chats yet." : "No guest chats yet."}
+                </p>
               )}
             </div>
           </section>
@@ -1910,12 +1984,17 @@ export default function Home() {
             </section>
           ) : null}
 
-          <section>
-            <h2>Starred library</h2>
+          <section className={styles.navSection}>
+            <div className={styles.navSectionHeader}>
+              <BookMarked size={13} aria-hidden="true" />
+              <h2>Starred</h2>
+              <span>{starredResponses.length}</span>
+            </div>
             <div className={styles.historyList}>
               {starredResponses.length ? (
                 starredResponses.slice(0, 8).map((response) => (
                   <button
+                    className={styles.starredButton}
                     key={response.message_id}
                     type="button"
                     onClick={() => void openSavedChat(response.session_id)}
@@ -1925,7 +2004,7 @@ export default function Home() {
                   </button>
                 ))
               ) : (
-                <p>No starred responses yet.</p>
+                <p className={styles.emptyNavText}>No starred responses yet.</p>
               )}
             </div>
           </section>

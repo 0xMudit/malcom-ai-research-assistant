@@ -357,6 +357,7 @@
 
 .accountPanel {
   display: grid;
+  align-content: start;
   gap: 12px;
   flex: 1 1 auto;
   min-height: 0;
@@ -372,15 +373,35 @@
     border-color 180ms ease;
 }
 
-.accountPanel > div:first-child {
-  display: flex;
+.workspaceCard {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 26%);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--background), transparent 12%);
+}
+
+.workspaceIcon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+}
+
+.workspaceCard > div:nth-child(2) {
+  display: grid;
+  gap: 2px;
   min-width: 0;
 }
 
-.accountPanel > div:first-child span {
+.workspaceCard span {
   overflow: hidden;
   color: var(--foreground);
   font-size: 13px;
@@ -390,7 +411,15 @@
   white-space: nowrap;
 }
 
-.accountPanel button {
+.workspaceCard p,
+.emptyNavText {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.accountPanel button,
+.iconMiniButton {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--muted-foreground);
@@ -398,32 +427,52 @@
   cursor: pointer;
 }
 
-.accountPanel > div:first-child button {
-  justify-self: start;
+.workspaceCard button {
   min-height: 28px;
   padding: 0 9px;
   font-size: 12px;
 }
 
-.accountPanel section {
+.workspaceCard .iconMiniButton {
+  width: 30px;
+  padding: 0;
+}
+
+.navSection {
   display: grid;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
 }
 
-.accountPanel h2 {
+.navSectionHeader {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  color: var(--muted-foreground);
+}
+
+.navSectionHeader h2 {
   color: var(--foreground);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.04em;
   line-height: 1.2;
   text-transform: uppercase;
 }
 
-.accountPanel p {
+.navSectionHeader span {
+  min-width: 22px;
+  padding: 2px 6px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 22%);
+  border-radius: 999px;
   color: var(--muted-foreground);
-  font-size: 12px;
-  line-height: 1.4;
+  background: color-mix(in oklch, var(--secondary), transparent 18%);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .historyList {
@@ -432,42 +481,50 @@
   min-width: 0;
 }
 
-.historyList button {
+.sessionOpenButton,
+.starredButton {
   display: grid;
   justify-items: start;
   gap: 4px;
   min-width: 0;
+  width: 100%;
   padding: 8px;
   text-align: left;
 }
 
 .sessionRow {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
   gap: 6px;
   min-width: 0;
 }
 
-.sessionRow > button {
-  width: 100%;
-}
-
-.sessionRow > div,
+.sessionActions,
 .sessionEditor > div {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
 }
 
-.sessionRow > div button,
+.sessionActions {
+  align-items: center;
+}
+
+.sessionActions button,
 .sessionEditor button,
 .clearGuestButton {
-  min-height: 28px;
-  padding: 0 7px;
+  min-height: 30px;
+  padding: 0 8px;
   font-size: 11px;
 }
 
+.sessionActions button {
+  width: 30px;
+  padding: 0;
+}
+
 .historyList button:hover,
-.accountPanel > div:first-child button:hover,
+.workspaceCard button:hover,
 .authSwitch button:hover {
   color: var(--foreground);
   border-color: color-mix(in oklch, var(--primary), transparent 55%);
@@ -490,19 +547,33 @@
   line-height: 1.2;
 }
 
-.historySearch,
+.historySearch {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--background), transparent 10%);
+}
+
 .sessionEditor {
   display: grid;
   gap: 7px;
 }
 
-.historySearch span {
-  color: var(--muted-foreground);
+.historySearch input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--foreground);
+  background: transparent;
   font-size: 12px;
-  line-height: 1.3;
 }
 
-.historySearch input,
 .sessionEditor input {
   width: 100%;
   min-height: 34px;
@@ -515,7 +586,7 @@
   font-size: 12px;
 }
 
-.historySearch input:focus,
+.historySearch:focus-within,
 .sessionEditor input:focus {
   border-color: var(--ring);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring), transparent 82%);

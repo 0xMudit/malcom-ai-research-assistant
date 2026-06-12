@@ -302,16 +302,16 @@ function getThinkingSnippetIndex() {
   );
 }
 
-function FighterLoader() {
+function ThoughtLabLoader() {
   return (
-    <div className={styles.fighterLoader} aria-hidden="true">
-      <span className={`${styles.fighter} ${styles.fighterLeft}`}>
-        <span />
+    <div className={styles.thoughtLab} aria-hidden="true">
+      <span className={`${styles.evidenceToken} ${styles.tokenOne}`} />
+      <span className={`${styles.evidenceToken} ${styles.tokenTwo}`} />
+      <span className={`${styles.evidenceToken} ${styles.tokenThree}`} />
+      <span className={styles.labCore}>
+        <BrainCircuit size={19} />
       </span>
-      <span className={`${styles.fighter} ${styles.fighterRight}`}>
-        <span />
-      </span>
-      <span className={styles.impact} />
+      <span className={styles.answerPulse} />
     </div>
   );
 }
@@ -1040,7 +1040,7 @@ export default function Home() {
                 <span>Malcom</span>
                 <div className={styles.thinking} aria-label="Malcom is working">
                   <strong>Malcom is working</strong>
-                  <FighterLoader />
+                  <ThoughtLabLoader />
                   <p>{thinkingSnippets[thinkingSnippetIndex]}</p>
                 </div>
               </div>

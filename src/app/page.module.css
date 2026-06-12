@@ -791,104 +791,100 @@
   line-height: 1.45;
 }
 
-.fighterLoader {
+.thoughtLab {
   position: relative;
-  width: min(220px, 100%);
-  height: 38px;
+  width: min(260px, 100%);
+  height: 48px;
   overflow: hidden;
   border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
-  border-radius: 999px;
-  background: color-mix(in oklch, var(--primary), transparent 90%);
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.34), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.34)),
+    radial-gradient(circle at 50% 50%, color-mix(in oklch, var(--primary), transparent 78%), transparent 34%),
+    color-mix(in oklch, var(--primary), transparent 92%);
   box-shadow:
     inset 0 0 18px rgba(0, 0, 0, 0.28),
     0 0 18px color-mix(in oklch, var(--primary), transparent 74%);
 }
 
-.fighterLoader::before {
+.thoughtLab::before,
+.thoughtLab::after {
   position: absolute;
+  top: 50%;
   right: 16px;
-  bottom: 8px;
   left: 16px;
   height: 1px;
-  background: color-mix(in oklch, var(--foreground), transparent 80%);
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--primary), transparent 42%), transparent);
   content: "";
+  transform: translateY(-50%);
 }
 
-.fighter {
-  position: absolute;
-  bottom: 9px;
-  width: 12px;
-  height: 20px;
-  color: var(--primary);
+.thoughtLab::after {
+  top: 18px;
+  opacity: 0.45;
 }
 
-.fighter::before {
+.evidenceToken {
   position: absolute;
-  top: 0;
-  left: 4px;
-  width: 7px;
-  height: 7px;
-  border: 1.8px solid currentColor;
-  border-radius: 50%;
-  content: "";
-}
-
-.fighter::after {
-  position: absolute;
-  top: 8px;
-  left: 7px;
-  width: 2px;
-  height: 12px;
+  top: 20px;
+  left: 18px;
+  z-index: 1;
+  width: 24px;
+  height: 8px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 48%);
   border-radius: 999px;
-  background: currentColor;
-  box-shadow:
-    -5px 10px 0 -0.5px currentColor,
-    5px 10px 0 -0.5px currentColor;
-  content: "";
-  transform-origin: top;
+  background:
+    linear-gradient(90deg, var(--primary), transparent),
+    color-mix(in oklch, var(--card), transparent 16%);
+  opacity: 0;
+  animation: evidenceFlow 2.6s cubic-bezier(0.44, 0, 0.2, 1) infinite;
 }
 
-.fighter > span {
+.tokenTwo {
+  top: 13px;
+  width: 18px;
+  animation-delay: 0.42s;
+}
+
+.tokenThree {
+  top: 29px;
+  width: 20px;
+  animation-delay: 0.84s;
+}
+
+.labCore {
   position: absolute;
-  top: 10px;
-  left: 4px;
-  width: 16px;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 38%);
+  border-radius: 50%;
+  color: var(--primary);
+  background:
+    radial-gradient(circle at 50% 50%, color-mix(in oklch, var(--primary), transparent 72%), transparent 62%),
+    var(--card);
+  box-shadow: 0 0 22px color-mix(in oklch, var(--primary), transparent 58%);
+  transform: translate(-50%, -50%);
+  animation: labCorePulse 2.6s ease-in-out infinite;
+}
+
+.answerPulse {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  z-index: 1;
+  width: 34px;
   height: 2px;
   border-radius: 999px;
-  background: currentColor;
-  transform-origin: 2px 50%;
-}
-
-.fighterLeft {
-  left: calc(50% - 48px);
-  animation: fighterStepLeft 1.1s ease-in-out infinite;
-}
-
-.fighterLeft > span {
-  animation: fighterPunchLeft 1.1s ease-in-out infinite;
-}
-
-.fighterRight {
-  right: calc(50% - 48px);
-  color: var(--foreground);
-  transform: scaleX(-1);
-  animation: fighterStepRight 1.1s ease-in-out infinite;
-}
-
-.fighterRight > span {
-  animation: fighterPunchRight 1.1s ease-in-out infinite;
-}
-
-.impact {
-  position: absolute;
-  top: 15px;
-  left: calc(50% - 4px);
-  width: 8px;
-  height: 8px;
-  border: 1px solid var(--primary);
-  border-radius: 50%;
+  background: linear-gradient(90deg, var(--primary), transparent);
   opacity: 0;
-  animation: impactPop 1.1s ease-in-out infinite;
+  transform: translateY(-50%) scaleX(0.4);
+  transform-origin: left;
+  animation: answerEmit 2.6s ease-in-out infinite;
 }
 
 .composerWrap {
@@ -1158,70 +1154,56 @@
   }
 }
 
-@keyframes fighterStepLeft {
-  0%,
-  100% {
-    transform: translateX(0);
+@keyframes evidenceFlow {
+  0% {
+    opacity: 0;
+    transform: translateX(0) scaleX(0.68);
   }
 
-  45%,
-  55% {
-    transform: translateX(12px);
-  }
-}
-
-@keyframes fighterStepRight {
-  0%,
-  100% {
-    transform: scaleX(-1) translateX(0);
+  16% {
+    opacity: 1;
   }
 
-  45%,
-  55% {
-    transform: scaleX(-1) translateX(12px);
-  }
-}
-
-@keyframes fighterPunchLeft {
-  0%,
-  34%,
-  70%,
-  100% {
-    transform: rotate(-18deg) scaleX(0.8);
+  58% {
+    opacity: 1;
+    transform: translateX(95px) scaleX(1);
   }
 
-  46%,
-  56% {
-    transform: rotate(-4deg) scaleX(1.45);
-  }
-}
-
-@keyframes fighterPunchRight {
-  0%,
-  34%,
-  70%,
-  100% {
-    transform: rotate(-18deg) scaleX(0.8);
-  }
-
-  50%,
-  60% {
-    transform: rotate(-4deg) scaleX(1.35);
-  }
-}
-
-@keyframes impactPop {
-  0%,
-  42%,
-  72%,
+  74%,
   100% {
     opacity: 0;
-    transform: scale(0.45);
+    transform: translateX(118px) scaleX(0.32);
+  }
+}
+
+@keyframes labCorePulse {
+  0%,
+  100% {
+    box-shadow: 0 0 18px color-mix(in oklch, var(--primary), transparent 68%);
+    transform: translate(-50%, -50%) scale(0.96);
   }
 
-  50% {
+  56% {
+    box-shadow: 0 0 30px color-mix(in oklch, var(--primary), transparent 38%);
+    transform: translate(-50%, -50%) scale(1.04);
+  }
+}
+
+@keyframes answerEmit {
+  0%,
+  60% {
+    opacity: 0;
+    transform: translateY(-50%) scaleX(0.3);
+  }
+
+  72% {
     opacity: 1;
-    transform: scale(1.3);
+    transform: translateY(-50%) scaleX(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-50%) translateX(26px) scaleX(0.55);
   }
 }
 

@@ -4,5 +4,5 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return Response.json(getStats());
+  return Response.json(await getStats());
 }

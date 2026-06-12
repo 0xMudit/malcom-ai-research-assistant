@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getUserFromRequest } from "@/lib/auth";
 import { saveChatMessage } from "@/lib/database";
 
 const MODEL =
@@ -78,7 +79,15 @@ function readMessages(body: unknown) {
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null);
+    const user = await getUserFromRequest(request);
     const messages = readMessages(body).slice(-60);
+    const profileMemory =
+      body &&
+      typeof body === "object" &&
+      !Array.isArray(body) &&
+      typeof (body as Record<string, unknown>).profileMemory === "string"
+        ? cleanText((body as Record<string, unknown>).profileMemory).slice(0, 4000)
+        : "";
 
     if (messages.length === 0) {
       return NextResponse.json(
@@ -107,9 +116,10 @@ export async function POST(request: Request) {
     }
 
     for (const message of messages) {
-      saveChatMessage({
+      await saveChatMessage({
         id: message.id,
         sessionId,
+        userId: user?.id,
         role: message.role,
         content: message.content,
         title: latestUserMessage.content,
@@ -144,6 +154,9 @@ export async function POST(request: Request) {
                   "Use Markdown tables only when comparing structured data, and keep each table row complete.",
                   "When returning code, use fenced code blocks with the correct language tag.",
                   "Do not provide instructions for violence, weapons, physical harm, or evading safety controls.",
+                  profileMemory
+                    ? `User profile memory: ${profileMemory}`
+                    : "",
                 ].join(" "),
             },
             ...messages.map(({ role, content }) => ({ role, content })),
@@ -198,9 +211,10 @@ export async function POST(request: Request) {
     }
 
     const responseId = crypto.randomUUID();
-    saveChatMessage({
+    await saveChatMessage({
       id: responseId,
       sessionId,
+      userId: user?.id,
       role: "assistant",
       content: message,
       title: latestUserMessage.content,

@@ -33,6 +33,8 @@ import {
   useRef,
   useState,
 } from "react";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import styles from "./page.module.css";
 
 type Role = "user" | "assistant";
@@ -46,6 +48,29 @@ type Message = {
 type StoredChat = {
   sessionId: string;
   messages: Message[];
+};
+
+type SavedSession = {
+  id: string;
+  title: string;
+  folder?: string | null;
+  tags?: string | null;
+  pinned?: number | boolean | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type StarredResponse = {
+  id: string;
+  message_id: string;
+  session_id: string;
+  content: string;
+  created_at: string;
+};
+
+type UserProfile = {
+  display_name: string;
+  memory: string;
 };
 
 type AppStats = {
@@ -67,37 +92,137 @@ type ResponseState = {
   status?: string;
 };
 
-const starterPrompts = [
+type StarterPrompt = {
+  title: string;
+  prompt: string;
+};
+
+const starterPromptPool: StarterPrompt[] = [
   {
-    title: "Research",
+    title: "Unhinged summary",
+    prompt: "Explain this like a smart friend who is tired of corporate nonsense.",
+  },
+  {
+    title: "Reality check",
+    prompt: "Tell me what I am missing, what could go wrong, and what actually matters.",
+  },
+  {
+    title: "Main character plan",
+    prompt: "Turn this messy goal into a focused 7-day plan I can actually follow.",
+  },
+  {
+    title: "Hot take audit",
+    prompt: "Give me the strongest argument for and against this idea, then pick a side.",
+  },
+  {
+    title: "No-fluff roast",
+    prompt: "Critique this brutally but usefully, then tell me exactly how to fix it.",
+  },
+  {
+    title: "DM draft",
+    prompt: "Write a confident, low-cringe message for this situation.",
+  },
+  {
+    title: "Brain dump",
+    prompt: "Turn my chaotic notes into a clean answer with action items.",
+  },
+  {
+    title: "Study mode",
+    prompt: "Teach me this topic fast using examples, memory hooks, and a quick quiz.",
+  },
+  {
+    title: "Career move",
+    prompt: "Help me make this career decision with risks, upside, and next steps.",
+  },
+  {
+    title: "Vibe check",
+    prompt: "Read this situation and tell me what the signals probably mean.",
+  },
+  {
+    title: "Creator fuel",
+    prompt: "Give me 10 sharp content ideas from this topic that do not feel generic.",
+  },
+  {
+    title: "Decision boss",
+    prompt: "Compare these options and tell me the best choice for speed, risk, and payoff.",
+  },
+  {
+    title: "Receipts only",
+    prompt: "Separate facts, assumptions, and guesses in this argument.",
+  },
+  {
+    title: "Pitch glow-up",
+    prompt: "Make this pitch clearer, punchier, and harder to ignore.",
+  },
+  {
+    title: "Text decoder",
+    prompt: "Analyze this message and suggest the best reply without sounding desperate.",
+  },
+  {
+    title: "Exam clutch",
+    prompt: "Make me a last-minute study guide for this topic with the highest-yield points.",
+  },
+  {
+    title: "Startup brain",
+    prompt: "Stress-test this business idea and find the fastest way to validate it.",
+  },
+  {
+    title: "Soft skills",
+    prompt: "Help me say this honestly without sounding rude, needy, or vague.",
+  },
+  {
+    title: "Deep dive",
     prompt: "Build a research brief from these notes and identify the unknowns.",
   },
   {
-    title: "Engineering",
+    title: "Tech check",
     prompt: "Review this system design and call out failure modes.",
-  },
-  {
-    title: "Analysis",
-    prompt: "Compare these competing hypotheses and rank the evidence.",
-  },
-  {
-    title: "Field Notes",
-    prompt: "Turn these raw observations into an actionable report.",
   },
 ];
 
 const initialMessages: Message[] = [];
 const chatStorageKey = "malcom.chat.v2";
+const guestSessionsKey = "malcom.guest.sessions.v1";
+const guestStarsKey = "malcom.guest.stars.v1";
 const startupAnimationMs = 1800;
-const snippetRotationMs = 30 * 60 * 1000;
+const factRotationMs = 5000;
 
-const thinkingSnippets = [
-  "Which assumption would embarrass this answer if it were false?",
-  "What evidence would change the strongest opinion in the room?",
-  "Who benefits if this metric is treated as neutral?",
-  "What conclusion are we avoiding because it is inconvenient?",
-  "Which risk sounds dramatic but is actually measurable?",
-  "What would the opposing expert say in one precise sentence?",
+const fallbackSexualHealthFacts = [
+  "Consent works best as an active, ongoing check-in, not a one-time yes.",
+  "Open conversations about boundaries are linked with more satisfying intimate relationships.",
+  "Kissing and close touch can release oxytocin, a hormone associated with bonding and trust.",
+  "Condoms are most effective when they are stored cool, dry, and used before any genital contact.",
+  "Arousal is not the same thing as consent; clear communication matters every time.",
+  "Regular STI screening is a normal part of sexual health, even when there are no symptoms.",
+  "Stress and poor sleep can reduce libido because they affect hormones, mood, and attention.",
+  "Lubrication can reduce friction and help make sex safer and more comfortable.",
+];
+
+const starterModes = [
+  {
+    name: "Study",
+    prompt: "Teach me this topic step by step, then quiz me with five questions.",
+  },
+  {
+    name: "Research",
+    prompt: "Build a concise research brief with claims, evidence, gaps, and next steps.",
+  },
+  {
+    name: "Code Review",
+    prompt: "Review this code or design for bugs, risks, and missing tests.",
+  },
+  {
+    name: "Explain",
+    prompt: "Explain this clearly with examples and no unnecessary jargon.",
+  },
+  {
+    name: "Draft",
+    prompt: "Draft this message so it is clear, direct, and polished.",
+  },
+  {
+    name: "Plan",
+    prompt: "Turn this goal into a practical plan with priorities and concrete next actions.",
+  },
 ];
 
 function createMessageId() {
@@ -156,13 +281,23 @@ function normalizeMarkdown(content: string) {
           (_, math: string) => `$${normalizeMath(math)}$`,
         )
         .replace(
-          /(\${1,2})([\s\S]*?)\1/g,
-          (match, delimiter: string, math: string) => {
+          /\$\$([\s\S]*?)\$\$/g,
+          (match, math: string) => {
             if (!math.trim()) {
               return match;
             }
 
-            return `${delimiter}${normalizeMath(math)}${delimiter}`;
+            return `$$${normalizeMath(math)}$$`;
+          },
+        )
+        .replace(
+          /(?<!\$)\$([^$\n]+)\$(?!\$)/g,
+          (match, math: string) => {
+            if (!math.trim()) {
+              return match;
+            }
+
+            return `$${normalizeMath(math)}$`;
           },
         )
         .replace(/([^\n])(\s*#{1,6}\s+)/g, "$1\n\n$2")
@@ -175,6 +310,8 @@ function normalizeMarkdown(content: string) {
 
 function normalizeMath(math: string) {
   return math
+    .replace(/\\text_\{([^}]+)\}/g, "\\text{$1}")
+    .replace(/\\(hat|bar|tilde|vec)_\{([^}]+)\}/g, "\\$1{$2}")
     .replace(/\\bar_\{([^}]+)\}/g, "\\bar{$1}")
     .replace(/\bSE\b/g, "\\mathrm{SE}")
     .replace(
@@ -186,6 +323,23 @@ function normalizeMath(math: string) {
 function normalizeBrokenMathText(content: string) {
   return content
     .replace(/[\u200b-\u200d\ufeff]/g, "")
+    .replace(/\\text_\{([^}]+)\}/g, "\\text{$1}")
+    .replace(/\\(hat|bar|tilde|vec)_\{([^}]+)\}/g, "\\$1{$2}")
+    .replace(
+      /\by\s*\n\s*=\s*\n\s*m\s*\n\s*x\s*\n\s*\+\s*\n\s*c\s*\n\s*y\s*=\s*m\s*x\s*\+\s*c\b/g,
+      "$y = mx + c$",
+    )
+    .replace(/(?<!\$)\by\s*=\s*m\s*x\s*\+\s*c\b(?!\$)/g, "$y = mx + c$")
+    .replace(
+      /\(\s*x\s*\n\s*i\s*\n\s*,\s*y\s*\n\s*i\s*\n\s*\)\s*\(\s*x\s*i\s*,\s*y\s*i\s*\)/g,
+      "$(x_i, y_i)$",
+    )
+    .replace(/(?<!\$)\(\s*x_i\s*,\s*y_i\s*\)(?!\$)/g, "$(x_i, y_i)$")
+    .replace(
+      /\\text\{([^}]+)\}\s*\\hat\{([^}]+)\}\s*=\s*m\s*x\s*\+\s*c/g,
+      (_, label: string, variable: string) =>
+        `$$\\text{${label}}\\hat{${variable}} = mx + c$$`,
+    )
     .replace(
       /\(\s*H\s*\n\s*0\s*H\s*0\s*:\s*([^)]+)\)/g,
       "($H_0$: $1)",
@@ -277,6 +431,62 @@ function loadStoredChat(): StoredChat {
   }
 }
 
+function readJsonArray<T>(key: string): T[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const value = window.localStorage.getItem(key);
+    const parsed = value ? JSON.parse(value) : [];
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeJsonArray<T>(key: string, value: T[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function chatTitle(messages: Message[]) {
+  const firstUser = messages.find((message) => message.role === "user");
+  return firstUser?.content.slice(0, 80).trim() || "Untitled";
+}
+
+function saveGuestSession(sessionId: string, messages: Message[]) {
+  if (!messages.length) {
+    return;
+  }
+
+  const sessions = readJsonArray<SavedSession & { messages?: Message[] }>(
+    guestSessionsKey,
+  );
+  const existing = sessions.find((session) => session.id === sessionId);
+  const now = new Date().toISOString();
+  const nextSession = {
+    id: sessionId,
+    title: existing?.title || chatTitle(messages),
+    folder: existing?.folder || "",
+    tags: existing?.tags || "",
+    pinned: existing?.pinned || false,
+    created_at: existing?.created_at || now,
+    updated_at: now,
+    messages,
+  };
+
+  writeJsonArray(
+    guestSessionsKey,
+    [nextSession, ...sessions.filter((session) => session.id !== sessionId)]
+      .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)))
+      .slice(0, 50),
+  );
+}
+
 function MalcomAvatar({ active = false }: { active?: boolean }) {
   return (
     <div
@@ -296,24 +506,10 @@ function UserAvatar() {
   );
 }
 
-function getThinkingSnippetIndex() {
-  return (
-    Math.floor(Date.now() / snippetRotationMs) % thinkingSnippets.length
-  );
-}
-
-function ThoughtLabLoader() {
-  return (
-    <div className={styles.thoughtLab} aria-hidden="true">
-      <span className={`${styles.evidenceToken} ${styles.tokenOne}`} />
-      <span className={`${styles.evidenceToken} ${styles.tokenTwo}`} />
-      <span className={`${styles.evidenceToken} ${styles.tokenThree}`} />
-      <span className={styles.labCore}>
-        <BrainCircuit size={19} />
-      </span>
-      <span className={styles.answerPulse} />
-    </div>
-  );
+function getRandomStarterPrompts(count = 4) {
+  return [...starterPromptPool]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, count);
 }
 
 const MessageItem = memo(function MessageItem({
@@ -322,21 +518,29 @@ const MessageItem = memo(function MessageItem({
   onCopy,
   onReaction,
   onRegenerate,
+  onToggleStar,
   onToggleComment,
   onCommentChange,
   onSubmitComment,
+  starred,
 }: {
   message: Message;
   responseState?: ResponseState;
   onCopy(id: string, content: string): void;
   onReaction(id: string, reaction: ResponseReaction): void;
   onRegenerate(id: string): void;
+  onToggleStar(id: string, content: string): void;
   onToggleComment(id: string): void;
   onCommentChange(id: string, comment: string): void;
   onSubmitComment(id: string): void;
+  starred: boolean;
 }) {
   return (
-    <article className={`${styles.message} ${styles[message.role]}`}>
+    <article
+      className={`${styles.message} ${styles[message.role]} ${
+        message.role === "assistant" ? styles.messageEntered : ""
+      }`}
+    >
       {message.role === "assistant" ? <MalcomAvatar /> : <UserAvatar />}
       <div className={styles.messageBody}>
         <span>{message.role === "assistant" ? "Malcom" : "You"}</span>
@@ -373,6 +577,15 @@ const MessageItem = memo(function MessageItem({
                 title="Dislike"
               >
                 <ThumbsDown size={15} />
+              </button>
+              <button
+                type="button"
+                className={starred ? styles.actionActive : ""}
+                onClick={() => onToggleStar(message.id, message.content)}
+                aria-label={starred ? "Unstar response" : "Star response"}
+                title={starred ? "Unstar" : "Star"}
+              >
+                <Star size={15} />
               </button>
               <button
                 type="button"
@@ -448,17 +661,80 @@ export default function Home() {
   const [accessEmail, setAccessEmail] = useState("");
   const [accessStatus, setAccessStatus] = useState("");
   const [isSubmittingAccess, setIsSubmittingAccess] = useState(false);
-  const [thinkingSnippetIndex, setThinkingSnippetIndex] = useState(() =>
-    getThinkingSnippetIndex(),
+  const [starterPrompts, setStarterPrompts] = useState(() =>
+    starterPromptPool.slice(0, 4),
   );
+  const [factQueue, setFactQueue] = useState(fallbackSexualHealthFacts);
+  const [factCursor, setFactCursor] = useState(0);
+  const [factVisible, setFactVisible] = useState(true);
   const [responseStates, setResponseStates] = useState<
     Record<string, ResponseState>
   >({});
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [accessToken, setAccessToken] = useState("");
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"sign-in" | "sign-up">("sign-in");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authStatus, setAuthStatus] = useState("");
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+  const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
+  const [starredResponses, setStarredResponses] = useState<StarredResponse[]>(
+    [],
+  );
+  const [historyStatus, setHistoryStatus] = useState("");
+  const [guestSessions, setGuestSessions] = useState<
+    (SavedSession & { messages?: Message[] })[]
+  >([]);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profile, setProfile] = useState<UserProfile>({
+    display_name: "",
+    memory: "",
+  });
+  const [profileStatus, setProfileStatus] = useState("");
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [editingSessionId, setEditingSessionId] = useState("");
+  const [editingTitle, setEditingTitle] = useState("");
+  const [editingFolder, setEditingFolder] = useState("");
+  const [editingTags, setEditingTags] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const requestTokenRef = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const factQueueRef = useRef(fallbackSexualHealthFacts);
+  const supabaseRef = useRef<SupabaseClient | null>(null);
+
+  const starredMessageIds = useMemo(
+    () => new Set(starredResponses.map((response) => response.message_id)),
+    [starredResponses],
+  );
+  const activeSessions = authUser ? savedSessions : guestSessions;
+  const filteredSessions = useMemo(() => {
+    const query = historyQuery.trim().toLowerCase();
+
+    return activeSessions.filter((session) => {
+      if (!query) {
+        return true;
+      }
+
+      return [session.title, session.folder || "", session.tags || ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [activeSessions, historyQuery]);
+  const pinnedSessions = filteredSessions.filter((session) =>
+    Boolean(session.pinned),
+  );
+  const unpinnedSessions = filteredSessions.filter(
+    (session) => !Boolean(session.pinned),
+  );
+  const showUpgradePrompt =
+    !authUser &&
+    hasLoadedStoredChat &&
+    (messages.filter((message) => message.role === "user").length >= 3 ||
+      starredResponses.length > 0);
 
   const visiblePrompt = useMemo(
     () => messages.length === 0 && input.trim().length === 0,
@@ -470,7 +746,10 @@ export default function Home() {
       const stored = loadStoredChat();
       setSessionId(stored.sessionId);
       setMessages(stored.messages);
+      setGuestSessions(readJsonArray(guestSessionsKey));
+      setStarredResponses(readJsonArray(guestStarsKey));
       setHasLoadedStoredChat(true);
+      setStarterPrompts(getRandomStarterPrompts());
     }, 0);
 
     const startupTimer = window.setTimeout(
@@ -485,6 +764,45 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+    supabaseRef.current = supabase;
+
+    if (!supabase) {
+      return;
+    }
+
+    void supabase.auth.getSession().then(({ data }) => {
+      setAuthUser(data.session?.user || null);
+      setAccessToken(data.session?.access_token || "");
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user || null);
+      setAccessToken(session?.access_token || "");
+
+      if (!session) {
+        setSavedSessions([]);
+        setStarredResponses([]);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!authUser || !accessToken) {
+      return;
+    }
+
+    void refreshUserWorkspace(accessToken);
+    void syncGuestStars(accessToken);
+    // refreshUserWorkspace is intentionally read from the latest render here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser, accessToken]);
+
+  useEffect(() => {
     if (!hasLoadedStoredChat) {
       return;
     }
@@ -493,20 +811,23 @@ export default function Home() {
       chatStorageKey,
       JSON.stringify({ sessionId, messages }),
     );
-  }, [hasLoadedStoredChat, messages, sessionId]);
+
+    if (!authUser) {
+      saveGuestSession(sessionId, messages);
+      // localStorage is the external source of truth for guest history.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setGuestSessions(readJsonArray(guestSessionsKey));
+    }
+  }, [authUser, hasLoadedStoredChat, messages, sessionId]);
 
   useEffect(() => {
     void refreshStats();
+    void refreshFactQueue();
   }, []);
 
   useEffect(() => {
-    const syncSnippet = () => setThinkingSnippetIndex(getThinkingSnippetIndex());
-    const timer = window.setInterval(syncSnippet, 60_000);
-
-    syncSnippet();
-
-    return () => window.clearInterval(timer);
-  }, []);
+    factQueueRef.current = factQueue;
+  }, [factQueue]);
 
   useEffect(() => {
     const thread = threadRef.current;
@@ -521,6 +842,44 @@ export default function Home() {
     });
   }, [error, isSending, messages]);
 
+  useEffect(() => {
+    if (!isSending) {
+      return;
+    }
+
+    let fadeTimer: number | undefined;
+    const timer = window.setInterval(() => {
+      setFactVisible(false);
+      fadeTimer = window.setTimeout(() => {
+        setFactCursor((current) => {
+          const queueLength = factQueueRef.current.length;
+
+          if (queueLength < 2) {
+            return current;
+          }
+
+          const next = current + 1;
+
+          if (next >= queueLength) {
+            void refreshFactQueue();
+            return 0;
+          }
+
+          return next;
+        });
+        setFactVisible(true);
+      }, 180);
+    }, factRotationMs);
+
+    return () => {
+      window.clearInterval(timer);
+
+      if (fadeTimer) {
+        window.clearTimeout(fadeTimer);
+      }
+    };
+  }, [isSending]);
+
   async function refreshStats() {
     try {
       const response = await fetch("/api/stats", { cache: "no-store" });
@@ -531,6 +890,364 @@ export default function Home() {
       }
     } catch {
       // Stats are secondary UI; chat should keep working if this fails.
+    }
+  }
+
+  function authHeaders(token = accessToken): Record<string, string> {
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async function refreshUserWorkspace(token = accessToken) {
+    if (!token) {
+      return;
+    }
+
+    setHistoryStatus("");
+
+    try {
+      const [sessionsResponse, starredResponse, profileResponse] = await Promise.all([
+        fetch("/api/user/chats", {
+          cache: "no-store",
+          headers: authHeaders(token),
+        }),
+        fetch("/api/user/starred-responses", {
+          cache: "no-store",
+          headers: authHeaders(token),
+        }),
+        fetch("/api/user/profile", {
+          cache: "no-store",
+          headers: authHeaders(token),
+        }),
+      ]);
+
+      if (!sessionsResponse.ok || !starredResponse.ok || !profileResponse.ok) {
+        throw new Error("Could not load account history.");
+      }
+
+      const sessionsData = (await sessionsResponse.json()) as {
+        sessions?: SavedSession[];
+      };
+      const starredData = (await starredResponse.json()) as {
+        starred?: StarredResponse[];
+      };
+      const profileData = (await profileResponse.json()) as {
+        profile?: UserProfile;
+      };
+
+      setSavedSessions(sessionsData.sessions || []);
+      setStarredResponses(starredData.starred || []);
+      setProfile(profileData.profile || { display_name: "", memory: "" });
+    } catch (caughtError) {
+      setHistoryStatus(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Could not load account history.",
+      );
+    }
+  }
+
+  async function openSavedChat(nextSessionId: string) {
+    if (!accessToken) {
+      const session = guestSessions.find((item) => item.id === nextSessionId);
+
+      if (!session) {
+        return;
+      }
+
+      setSessionId(session.id);
+      setMessages(session.messages || []);
+      setResponseStates({});
+      setError("");
+      return;
+    }
+
+    setHistoryStatus("Loading chat...");
+
+    try {
+      const response = await fetch(
+        `/api/user/chats?sessionId=${encodeURIComponent(nextSessionId)}`,
+        {
+          cache: "no-store",
+          headers: authHeaders(),
+        },
+      );
+      const data = (await response.json()) as {
+        messages?: Message[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not load saved chat.");
+      }
+
+      setSessionId(nextSessionId);
+      setMessages(data.messages || []);
+      setResponseStates({});
+      setError("");
+      setHistoryStatus("");
+    } catch (caughtError) {
+      setHistoryStatus(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Could not load saved chat.",
+      );
+    }
+  }
+
+  async function syncGuestStars(token = accessToken) {
+    const guestStars = readJsonArray<StarredResponse>(guestStarsKey);
+
+    if (!token || guestStars.length === 0) {
+      return;
+    }
+
+    await Promise.allSettled(
+      guestStars.map((star) =>
+        fetch("/api/user/starred-responses", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders(token),
+          },
+          body: JSON.stringify({
+            messageId: star.message_id,
+            sessionId: star.session_id,
+            content: star.content,
+            starred: true,
+          }),
+        }),
+      ),
+    );
+
+    window.localStorage.removeItem(guestStarsKey);
+    await refreshUserWorkspace(token);
+  }
+
+  function beginEditSession(session: SavedSession) {
+    setEditingSessionId(session.id);
+    setEditingTitle(session.title);
+    setEditingFolder(session.folder || "");
+    setEditingTags(session.tags || "");
+  }
+
+  function updateGuestSession(
+    nextSessionId: string,
+    patch: Partial<SavedSession>,
+  ) {
+    const sessions = readJsonArray<SavedSession & { messages?: Message[] }>(
+      guestSessionsKey,
+    ).map((session) =>
+      session.id === nextSessionId
+        ? { ...session, ...patch, updated_at: new Date().toISOString() }
+        : session,
+    );
+
+    writeJsonArray(guestSessionsKey, sessions);
+    setGuestSessions(sessions);
+  }
+
+  async function saveSessionEdits() {
+    if (!editingSessionId) {
+      return;
+    }
+
+    if (!accessToken) {
+      updateGuestSession(editingSessionId, {
+        title: editingTitle.slice(0, 80).trim() || "Untitled",
+        folder: editingFolder,
+        tags: editingTags,
+      });
+      setEditingSessionId("");
+      return;
+    }
+
+    await fetch("/api/user/chats", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+      },
+      body: JSON.stringify({
+        sessionId: editingSessionId,
+        title: editingTitle,
+        folder: editingFolder,
+        tags: editingTags,
+      }),
+    });
+    setEditingSessionId("");
+    await refreshUserWorkspace();
+  }
+
+  async function togglePinnedSession(session: SavedSession) {
+    const nextPinned = !Boolean(session.pinned);
+
+    if (!accessToken) {
+      updateGuestSession(session.id, { pinned: nextPinned });
+      return;
+    }
+
+    await fetch("/api/user/chats", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+      },
+      body: JSON.stringify({ sessionId: session.id, pinned: nextPinned }),
+    });
+    await refreshUserWorkspace();
+  }
+
+  async function deleteSession(nextSessionId: string) {
+    if (!window.confirm("Delete this chat?")) {
+      return;
+    }
+
+    if (!accessToken) {
+      const sessions = readJsonArray<SavedSession & { messages?: Message[] }>(
+        guestSessionsKey,
+      ).filter((session) => session.id !== nextSessionId);
+      writeJsonArray(guestSessionsKey, sessions);
+      setGuestSessions(sessions);
+
+      if (sessionId === nextSessionId) {
+        startNewChat();
+      }
+
+      return;
+    }
+
+    await fetch(`/api/user/chats?sessionId=${encodeURIComponent(nextSessionId)}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+    await refreshUserWorkspace();
+
+    if (sessionId === nextSessionId) {
+      startNewChat();
+    }
+  }
+
+  function clearGuestData() {
+    window.localStorage.removeItem(chatStorageKey);
+    window.localStorage.removeItem(guestSessionsKey);
+    window.localStorage.removeItem(guestStarsKey);
+    setGuestSessions([]);
+    setStarredResponses([]);
+    startNewChat();
+  }
+
+  async function saveProfile() {
+    if (!accessToken) {
+      return;
+    }
+
+    setProfileStatus("Saving...");
+
+    try {
+      const response = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify({
+          displayName: profile.display_name,
+          memory: profile.memory,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Profile was not saved.");
+      }
+
+      setProfileStatus("Saved.");
+      window.setTimeout(() => setProfileStatus(""), 1200);
+    } catch {
+      setProfileStatus("Could not save profile.");
+    }
+  }
+
+  async function submitAuth(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const supabase = supabaseRef.current;
+
+    if (!supabase) {
+      setAuthStatus("Supabase is not configured.");
+      return;
+    }
+
+    setIsSubmittingAuth(true);
+    setAuthStatus("");
+
+    try {
+      const authCall =
+        authMode === "sign-up"
+          ? supabase.auth.signUp({
+              email: authEmail.trim(),
+              password: authPassword,
+            })
+          : supabase.auth.signInWithPassword({
+              email: authEmail.trim(),
+              password: authPassword,
+            });
+      const { data, error: authError } = await authCall;
+
+      if (authError) {
+        throw authError;
+      }
+
+      setAuthUser(data.user || data.session?.user || null);
+      setAccessToken(data.session?.access_token || "");
+      setAuthPassword("");
+      setAuthStatus(
+        data.session
+          ? "Signed in."
+          : "Check your email to confirm the account, then sign in.",
+      );
+
+      if (data.session) {
+        setAuthOpen(false);
+      }
+    } catch (caughtError) {
+      setAuthStatus(
+        caughtError instanceof Error ? caughtError.message : "Sign in failed.",
+      );
+    } finally {
+      setIsSubmittingAuth(false);
+    }
+  }
+
+  async function signOut() {
+    await supabaseRef.current?.auth.signOut();
+    setAuthUser(null);
+    setAccessToken("");
+    setSavedSessions([]);
+    setStarredResponses(readJsonArray(guestStarsKey));
+    setProfile({ display_name: "", memory: "" });
+    setProfileOpen(false);
+  }
+
+  async function refreshFactQueue() {
+    try {
+      const response = await fetch("/api/sexual-health-facts?limit=80", {
+        cache: "no-store",
+      });
+      const data = (await response.json()) as {
+        facts?: { id?: number; fact?: string }[];
+      };
+      const facts =
+        data.facts
+          ?.map((item) => item.fact)
+          .filter((fact): fact is string => Boolean(fact?.trim())) || [];
+
+      if (response.ok && facts.length > 0) {
+        setFactQueue(facts);
+        setFactCursor(0);
+        factQueueRef.current = facts;
+      }
+    } catch {
+      // The local fallback keeps the loading card useful if the DB route fails.
     }
   }
 
@@ -557,17 +1274,22 @@ export default function Home() {
     setMessages(pendingMessages);
     setInput("");
     setError("");
+    setFactCursor(0);
+    setFactVisible(true);
     setIsSending(true);
+    void refreshFactQueue();
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...authHeaders(),
         },
         signal: controller.signal,
         body: JSON.stringify({
           sessionId,
+          profileMemory: authUser ? profile.memory : "",
           messages: pendingMessages.map(({ id, role, content }) => ({
             id,
             role,
@@ -600,6 +1322,7 @@ export default function Home() {
       ]);
       playResponsePing();
       void refreshStats();
+      void refreshUserWorkspace();
     } catch (caughtError) {
       if (
         caughtError instanceof DOMException &&
@@ -618,6 +1341,7 @@ export default function Home() {
     } finally {
       if (requestToken === requestTokenRef.current) {
         setIsSending(false);
+        setFactVisible(true);
         abortRef.current = null;
         requestAnimationFrame(() => textareaRef.current?.focus());
       }
@@ -641,6 +1365,7 @@ export default function Home() {
     window.localStorage.removeItem(chatStorageKey);
     setInput("");
     setError("");
+    setStarterPrompts(getRandomStarterPrompts());
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
@@ -750,6 +1475,74 @@ export default function Home() {
     }
 
     window.setTimeout(() => patchResponseState(id, { status: "" }), 1200);
+  }
+
+  async function toggleStarredResponse(id: string, content: string) {
+    const nextStarred = !starredMessageIds.has(id);
+    patchResponseState(id, { status: nextStarred ? "Starred" : "Unstarred" });
+
+    if (nextStarred) {
+      setStarredResponses((current) => [
+        {
+          id,
+          message_id: id,
+          session_id: sessionId,
+          content,
+          created_at: new Date().toISOString(),
+        },
+        ...current.filter((response) => response.message_id !== id),
+      ]);
+    } else {
+      setStarredResponses((current) =>
+        current.filter((response) => response.message_id !== id),
+      );
+    }
+
+    if (!accessToken) {
+      const nextStars = nextStarred
+        ? [
+            {
+              id,
+              message_id: id,
+              session_id: sessionId,
+              content,
+              created_at: new Date().toISOString(),
+            },
+            ...starredResponses.filter((response) => response.message_id !== id),
+          ]
+        : starredResponses.filter((response) => response.message_id !== id);
+
+      setStarredResponses(nextStars);
+      writeJsonArray(guestStarsKey, nextStars);
+      window.setTimeout(() => patchResponseState(id, { status: "" }), 1200);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/user/starred-responses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify({
+          messageId: id,
+          sessionId,
+          content,
+          starred: nextStarred,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Star was not saved.");
+      }
+
+      void refreshUserWorkspace();
+      window.setTimeout(() => patchResponseState(id, { status: "" }), 1200);
+    } catch {
+      patchResponseState(id, { status: "Could not save star" });
+      void refreshUserWorkspace();
+    }
   }
 
   function toggleResponseComment(id: string) {
@@ -944,16 +1737,189 @@ export default function Home() {
           <span>New chat</span>
         </button>
 
-        <button
-          className={styles.loginButton}
-          type="button"
-          onClick={() => setAccessOpen(true)}
-          aria-label="Request login access"
-          title="Login"
-        >
-          <LogIn size={16} />
-          <span>Login</span>
-        </button>
+        {!authUser ? (
+          <button
+            className={styles.loginButton}
+            type="button"
+            onClick={() => {
+              setAuthMode("sign-in");
+              setAuthOpen(true);
+            }}
+            aria-label="Sign in"
+            title="Login"
+          >
+            <LogIn size={16} />
+            <span>Login</span>
+          </button>
+        ) : null}
+
+        <div className={styles.accountPanel} aria-label="Account history">
+          {!authUser ? (
+            <div>
+              <span>Guest workspace</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("sign-up");
+                  setAuthOpen(true);
+                }}
+              >
+                Create account
+              </button>
+            </div>
+          ) : (
+            <div className={styles.historyHeader}>
+              <span>{profile.display_name || "History"}</span>
+              <button type="button" onClick={() => setProfileOpen(true)}>
+                Profile
+              </button>
+              <button type="button" onClick={() => void refreshUserWorkspace()}>
+                Refresh
+              </button>
+            </div>
+          )}
+
+          {historyStatus ? <p>{historyStatus}</p> : null}
+          {showUpgradePrompt && !authUser ? (
+            <div className={styles.upgradePrompt}>
+              <span>Stored on this device</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("sign-up");
+                  setAuthOpen(true);
+                }}
+              >
+                Sync
+              </button>
+            </div>
+          ) : null}
+
+          <label className={styles.historySearch}>
+            <span>Search</span>
+            <input
+              value={historyQuery}
+              onChange={(event) => setHistoryQuery(event.target.value)}
+              placeholder="Chats, folders, tags"
+            />
+          </label>
+
+          <section>
+            <h2>Pinned</h2>
+            <div className={styles.historyList}>
+              {pinnedSessions.length ? (
+                pinnedSessions.slice(0, 5).map((session) => (
+                  <article key={session.id} className={styles.sessionRow}>
+                    <button type="button" onClick={() => void openSavedChat(session.id)}>
+                      <span>{session.title}</span>
+                      <time>{session.folder || session.tags || "Pinned"}</time>
+                    </button>
+                    <div>
+                      <button type="button" onClick={() => void togglePinnedSession(session)}>
+                        Unpin
+                      </button>
+                      <button type="button" onClick={() => beginEditSession(session)}>
+                        Edit
+                      </button>
+                      <button type="button" onClick={() => void deleteSession(session.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <p>No pinned chats.</p>
+              )}
+            </div>
+          </section>
+
+          <section>
+            <h2>{authUser ? "Saved chats" : "Guest chats"}</h2>
+            <div className={styles.historyList}>
+              {unpinnedSessions.length ? (
+                unpinnedSessions.slice(0, 10).map((session) => (
+                  <article key={session.id} className={styles.sessionRow}>
+                    <button type="button" onClick={() => void openSavedChat(session.id)}>
+                      <span>{session.title}</span>
+                      <time>
+                        {[session.folder, session.tags].filter(Boolean).join(" / ") ||
+                          new Date(session.updated_at).toLocaleDateString()}
+                      </time>
+                    </button>
+                    <div>
+                      <button type="button" onClick={() => void togglePinnedSession(session)}>
+                        Pin
+                      </button>
+                      <button type="button" onClick={() => beginEditSession(session)}>
+                        Edit
+                      </button>
+                      <button type="button" onClick={() => void deleteSession(session.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <p>{authUser ? "No saved chats yet." : "No guest chats yet."}</p>
+              )}
+            </div>
+          </section>
+
+          {editingSessionId ? (
+            <section className={styles.sessionEditor}>
+              <h2>Edit chat</h2>
+              <input
+                value={editingTitle}
+                onChange={(event) => setEditingTitle(event.target.value)}
+                placeholder="Title"
+              />
+              <input
+                value={editingFolder}
+                onChange={(event) => setEditingFolder(event.target.value)}
+                placeholder="Folder"
+              />
+              <input
+                value={editingTags}
+                onChange={(event) => setEditingTags(event.target.value)}
+                placeholder="Tags"
+              />
+              <div>
+                <button type="button" onClick={() => void saveSessionEdits()}>
+                  Save
+                </button>
+                <button type="button" onClick={() => setEditingSessionId("")}>
+                  Cancel
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          <section>
+            <h2>Starred library</h2>
+            <div className={styles.historyList}>
+              {starredResponses.length ? (
+                starredResponses.slice(0, 8).map((response) => (
+                  <button
+                    key={response.message_id}
+                    type="button"
+                    onClick={() => void openSavedChat(response.session_id)}
+                  >
+                    <span>{response.content.slice(0, 80)}</span>
+                    <time>{new Date(response.created_at).toLocaleDateString()}</time>
+                  </button>
+                ))
+              ) : (
+                <p>No starred responses yet.</p>
+              )}
+            </div>
+          </section>
+
+          {!authUser ? (
+            <button className={styles.clearGuestButton} type="button" onClick={clearGuestData}>
+              Clear local chats
+            </button>
+          ) : null}
+        </div>
 
         <button
           className={styles.feedbackButton}
@@ -1004,6 +1970,17 @@ export default function Home() {
                 Built for scientists, engineers, intelligence teams, and researchers
                 who need rigorous synthesis, technical review, and operational clarity.
               </p>
+              <div className={styles.modeBar} aria-label="Starter modes">
+                {starterModes.map((mode) => (
+                  <button
+                    key={mode.name}
+                    type="button"
+                    onClick={() => setInput(mode.prompt)}
+                  >
+                    {mode.name}
+                  </button>
+                ))}
+              </div>
               <div className={styles.suggestions}>
                 {starterPrompts.map((item) => (
                   <button
@@ -1027,9 +2004,11 @@ export default function Home() {
               onCopy={copyResponse}
               onReaction={reactToResponse}
               onRegenerate={regenerateResponse}
+              onToggleStar={toggleStarredResponse}
               onToggleComment={toggleResponseComment}
               onCommentChange={changeResponseComment}
               onSubmitComment={submitResponseComment}
+              starred={starredMessageIds.has(message.id)}
             />
           ))}
 
@@ -1040,8 +2019,21 @@ export default function Home() {
                 <span>Malcom</span>
                 <div className={styles.thinking} aria-label="Malcom is working">
                   <strong>Malcom is working</strong>
-                  <ThoughtLabLoader />
-                  <p>{thinkingSnippets[thinkingSnippetIndex]}</p>
+                  <div
+                    className={styles.progressTrack}
+                    role="progressbar"
+                    aria-label="Waiting for Malcom response"
+                  >
+                    <span />
+                  </div>
+                  <p className={styles.factLabel}>Sexual health fact</p>
+                  <p
+                    className={`${styles.factText} ${
+                      factVisible ? styles.factTextVisible : ""
+                    }`}
+                  >
+                    {factQueue[factCursor] || fallbackSexualHealthFacts[0]}
+                  </p>
                 </div>
               </div>
             </article>
@@ -1078,6 +2070,178 @@ export default function Home() {
           </form>
         </div>
       </section>
+
+      {profileOpen ? (
+        <div
+          className={styles.dialogBackdrop}
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setProfileOpen(false);
+            }
+          }}
+        >
+          <section
+            className={styles.feedbackDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-title"
+          >
+            <div className={styles.dialogHeader}>
+              <div>
+                <p>{authUser?.email}</p>
+                <h2 id="profile-title">Profile memory</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProfileOpen(false)}
+                aria-label="Close profile"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <div className={styles.feedbackForm}>
+              <label>
+                <span>Display name</span>
+                <input
+                  value={profile.display_name}
+                  onChange={(event) =>
+                    setProfile((current) => ({
+                      ...current,
+                      display_name: event.target.value,
+                    }))
+                  }
+                  placeholder="Name Malcom should use"
+                />
+              </label>
+              <label>
+                <span>Memory</span>
+                <textarea
+                  value={profile.memory}
+                  onChange={(event) =>
+                    setProfile((current) => ({
+                      ...current,
+                      memory: event.target.value,
+                    }))
+                  }
+                  placeholder="Preferences, recurring context, response style, or work focus"
+                  rows={6}
+                />
+              </label>
+
+              {profileStatus ? (
+                <p className={styles.feedbackStatus}>{profileStatus}</p>
+              ) : null}
+
+              <button type="button" onClick={() => void saveProfile()}>
+                Save profile
+              </button>
+              <div className={styles.authSwitch}>
+                <button type="button" onClick={() => void signOut()}>
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {authOpen ? (
+        <div
+          className={styles.dialogBackdrop}
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setAuthOpen(false);
+            }
+          }}
+        >
+          <section
+            className={styles.feedbackDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="auth-title"
+          >
+            <div className={styles.dialogHeader}>
+              <div>
+                <p>Account</p>
+                <h2 id="auth-title">
+                  {authMode === "sign-up" ? "Create account" : "Sign in"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAuthOpen(false)}
+                aria-label="Close account dialog"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <form className={styles.feedbackForm} onSubmit={submitAuth}>
+              <label>
+                <span>Email</span>
+                <input
+                  required
+                  type="email"
+                  maxLength={180}
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  placeholder="you@example.com"
+                />
+              </label>
+              <label>
+                <span>Password</span>
+                <input
+                  required
+                  type="password"
+                  minLength={6}
+                  value={authPassword}
+                  onChange={(event) => setAuthPassword(event.target.value)}
+                  placeholder="Password"
+                />
+              </label>
+
+              {authStatus ? (
+                <p className={styles.feedbackStatus}>{authStatus}</p>
+              ) : null}
+
+              <button type="submit" disabled={isSubmittingAuth}>
+                {isSubmittingAuth
+                  ? "Working..."
+                  : authMode === "sign-up"
+                    ? "Create account"
+                    : "Sign in"}
+              </button>
+
+              <div className={styles.authSwitch}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAuthMode((current) =>
+                      current === "sign-in" ? "sign-up" : "sign-in",
+                    )
+                  }
+                >
+                  {authMode === "sign-in"
+                    ? "Create an account"
+                    : "I already have an account"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthOpen(false);
+                    setAccessOpen(true);
+                  }}
+                >
+                  Request access
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
 
       {feedbackOpen ? (
         <div

@@ -161,7 +161,8 @@
 .shellCollapsed .brandText,
 .shellCollapsed .primaryButton span,
 .shellCollapsed .loginButton span,
-.shellCollapsed .feedbackButton span {
+.shellCollapsed .feedbackButton span,
+.shellCollapsed .accountPanel {
   width: 0;
   opacity: 0;
   transform: translateX(-6px);
@@ -297,6 +298,188 @@
 }
 
 .feedbackButton {
+  width: 100%;
+}
+
+.accountPanel {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--card), transparent 14%);
+  transition:
+    opacity 180ms ease,
+    transform 220ms ease,
+    border-color 180ms ease;
+}
+
+.accountPanel > div:first-child {
+  display: grid;
+  gap: 7px;
+}
+
+.accountPanel > div:first-child span {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountPanel button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted-foreground);
+  background: var(--secondary);
+  cursor: pointer;
+}
+
+.accountPanel > div:first-child button {
+  justify-self: start;
+  min-height: 28px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+.accountPanel section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.accountPanel h2 {
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.accountPanel p {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.historyList {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.historyList button {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px;
+  text-align: left;
+}
+
+.sessionRow {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sessionRow > button {
+  width: 100%;
+}
+
+.sessionRow > div,
+.sessionEditor > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sessionRow > div button,
+.sessionEditor button,
+.clearGuestButton {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.historyList button:hover,
+.accountPanel > div:first-child button:hover,
+.authSwitch button:hover {
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--primary), transparent 55%);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+}
+
+.historyList span {
+  width: 100%;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 12px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyList time {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.historySearch,
+.sessionEditor {
+  display: grid;
+  gap: 7px;
+}
+
+.historySearch span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.historySearch input,
+.sessionEditor input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  outline: 0;
+  padding: 0 9px;
+  color: var(--foreground);
+  background: var(--background);
+  font-size: 12px;
+}
+
+.historySearch input:focus,
+.sessionEditor input:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring), transparent 82%);
+}
+
+.upgradePrompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 64%);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+}
+
+.upgradePrompt span {
+  color: var(--foreground);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.clearGuestButton {
   width: 100%;
 }
 
@@ -438,6 +621,31 @@
   margin-top: 10px;
 }
 
+.modeBar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.modeBar button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--foreground);
+  background: var(--secondary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modeBar button:hover {
+  border-color: color-mix(in oklch, var(--primary), transparent 52%);
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+}
+
 .suggestions button {
   display: grid;
   justify-items: start;
@@ -464,6 +672,10 @@
   width: min(860px, 100%);
   margin: 0 auto;
   padding: 18px 0;
+}
+
+.messageEntered {
+  animation: messageEntered 260ms ease both;
 }
 
 .user {
@@ -764,7 +976,7 @@
 
 .thinking {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   width: min(380px, 100%);
   padding: 14px;
   border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
@@ -784,107 +996,58 @@
   font-weight: 700;
 }
 
+.progressTrack {
+  position: relative;
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 68%);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+}
+
+.progressTrack span {
+  position: absolute;
+  inset: 1px auto 1px 1px;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--primary), white 12%),
+    var(--primary)
+  );
+  box-shadow: 0 0 14px color-mix(in oklch, var(--primary), transparent 46%);
+  animation: progressSweep 1.35s ease-in-out infinite;
+}
+
+.thinking .factLabel {
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
 .thinking p {
   max-width: 320px;
   color: var(--muted-foreground);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.48;
 }
 
-.thoughtLab {
-  position: relative;
-  width: min(260px, 100%);
-  height: 48px;
-  overflow: hidden;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
-  border-radius: 16px;
-  background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.34), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.34)),
-    radial-gradient(circle at 50% 50%, color-mix(in oklch, var(--primary), transparent 78%), transparent 34%),
-    color-mix(in oklch, var(--primary), transparent 92%);
-  box-shadow:
-    inset 0 0 18px rgba(0, 0, 0, 0.28),
-    0 0 18px color-mix(in oklch, var(--primary), transparent 74%);
-}
-
-.thoughtLab::before,
-.thoughtLab::after {
-  position: absolute;
-  top: 50%;
-  right: 16px;
-  left: 16px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--primary), transparent 42%), transparent);
-  content: "";
-  transform: translateY(-50%);
-}
-
-.thoughtLab::after {
-  top: 18px;
-  opacity: 0.45;
-}
-
-.evidenceToken {
-  position: absolute;
-  top: 20px;
-  left: 18px;
-  z-index: 1;
-  width: 24px;
-  height: 8px;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 48%);
-  border-radius: 999px;
-  background:
-    linear-gradient(90deg, var(--primary), transparent),
-    color-mix(in oklch, var(--card), transparent 16%);
+.factText {
+  min-height: 40px;
   opacity: 0;
-  animation: evidenceFlow 2.6s cubic-bezier(0.44, 0, 0.2, 1) infinite;
+  transform: translateY(4px);
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease;
 }
 
-.tokenTwo {
-  top: 13px;
-  width: 18px;
-  animation-delay: 0.42s;
-}
-
-.tokenThree {
-  top: 29px;
-  width: 20px;
-  animation-delay: 0.84s;
-}
-
-.labCore {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 38%);
-  border-radius: 50%;
-  color: var(--primary);
-  background:
-    radial-gradient(circle at 50% 50%, color-mix(in oklch, var(--primary), transparent 72%), transparent 62%),
-    var(--card);
-  box-shadow: 0 0 22px color-mix(in oklch, var(--primary), transparent 58%);
-  transform: translate(-50%, -50%);
-  animation: labCorePulse 2.6s ease-in-out infinite;
-}
-
-.answerPulse {
-  position: absolute;
-  top: 50%;
-  right: 20px;
-  z-index: 1;
-  width: 34px;
-  height: 2px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--primary), transparent);
-  opacity: 0;
-  transform: translateY(-50%) scaleX(0.4);
-  transform-origin: left;
-  animation: answerEmit 2.6s ease-in-out infinite;
+.factTextVisible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .composerWrap {
@@ -1117,6 +1280,22 @@
   background: var(--secondary);
 }
 
+.authSwitch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.authSwitch button {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted-foreground);
+  background: var(--secondary);
+  cursor: pointer;
+}
+
 @keyframes startupExit {
   0%,
   68% {
@@ -1154,59 +1333,6 @@
   }
 }
 
-@keyframes evidenceFlow {
-  0% {
-    opacity: 0;
-    transform: translateX(0) scaleX(0.68);
-  }
-
-  16% {
-    opacity: 1;
-  }
-
-  58% {
-    opacity: 1;
-    transform: translateX(95px) scaleX(1);
-  }
-
-  74%,
-  100% {
-    opacity: 0;
-    transform: translateX(118px) scaleX(0.32);
-  }
-}
-
-@keyframes labCorePulse {
-  0%,
-  100% {
-    box-shadow: 0 0 18px color-mix(in oklch, var(--primary), transparent 68%);
-    transform: translate(-50%, -50%) scale(0.96);
-  }
-
-  56% {
-    box-shadow: 0 0 30px color-mix(in oklch, var(--primary), transparent 38%);
-    transform: translate(-50%, -50%) scale(1.04);
-  }
-}
-
-@keyframes answerEmit {
-  0%,
-  60% {
-    opacity: 0;
-    transform: translateY(-50%) scaleX(0.3);
-  }
-
-  72% {
-    opacity: 1;
-    transform: translateY(-50%) scaleX(1);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translateY(-50%) translateX(26px) scaleX(0.55);
-  }
-}
-
 @keyframes commentIn {
   0% {
     opacity: 0;
@@ -1216,6 +1342,32 @@
   100% {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes messageEntered {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progressSweep {
+  0% {
+    transform: translateX(-105%);
+  }
+
+  52% {
+    transform: translateX(75%);
+  }
+
+  100% {
+    transform: translateX(245%);
   }
 }
 
@@ -1282,7 +1434,8 @@
   .shellCollapsed .brandText,
   .shellCollapsed .primaryButton span,
   .shellCollapsed .loginButton span,
-  .shellCollapsed .feedbackButton span {
+  .shellCollapsed .feedbackButton span,
+  .shellCollapsed .accountPanel {
     display: none;
   }
 

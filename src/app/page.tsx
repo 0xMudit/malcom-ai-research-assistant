@@ -186,6 +186,8 @@ const guestSessionsKey = "malcom.guest.sessions.v1";
 const guestStarsKey = "malcom.guest.stars.v1";
 const startupAnimationMs = 1800;
 const factRotationMs = 5000;
+const authEmailRedirectTo =
+  process.env.NEXT_PUBLIC_SITE_URL || "http://65.0.71.41:3000/";
 
 const fallbackSexualHealthFacts = [
   "Consent works best as an active, ongoing check-in, not a one-time yes.",
@@ -1193,6 +1195,9 @@ export default function Home() {
           ? supabase.auth.signUp({
               email: authEmail.trim(),
               password: authPassword,
+              options: {
+                emailRedirectTo: authEmailRedirectTo,
+              },
             })
           : supabase.auth.signInWithPassword({
               email: authEmail.trim(),
@@ -1717,48 +1722,52 @@ export default function Home() {
       ) : null}
 
       <aside className={styles.sidebar} aria-label="Conversation navigation">
-        <div className={styles.brand}>
-          <MalcomAvatar active />
-          <div className={styles.brandText}>
-            <h1>Malcom</h1>
-            <p className={styles.developerCredit}>
-              <span>Developed by</span>
-              <strong>Muditya Raghav</strong>
-              <a href="mailto:0xMudit@gmail.com">0xMudit@gmail.com</a>
-            </p>
+        <div className={styles.sidebarHeader}>
+          <div className={styles.brand}>
+            <MalcomAvatar active />
+            <div className={styles.brandText}>
+              <h1>Malcom</h1>
+              <p className={styles.developerCredit}>
+                <span>Developed by</span>
+                <strong>Muditya Raghav</strong>
+                <a href="mailto:0xMudit@gmail.com">0xMudit@gmail.com</a>
+              </p>
+            </div>
           </div>
+
+          <button
+            className={styles.iconButton}
+            type="button"
+            onClick={() => setSidebarCollapsed((current) => !current)}
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          </button>
         </div>
 
-        <button
-          className={styles.iconButton}
-          type="button"
-          onClick={() => setSidebarCollapsed((current) => !current)}
-          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
-        </button>
-
-        <button className={styles.primaryButton} type="button" onClick={startNewChat}>
-          <Plus size={16} />
-          <span>New chat</span>
-        </button>
-
-        {!authUser ? (
-          <button
-            className={styles.loginButton}
-            type="button"
-            onClick={() => {
-              setAuthMode("sign-in");
-              setAuthOpen(true);
-            }}
-            aria-label="Sign in"
-            title="Login"
-          >
-            <LogIn size={16} />
-            <span>Login</span>
+        <div className={styles.sidebarActions}>
+          <button className={styles.primaryButton} type="button" onClick={startNewChat}>
+            <Plus size={16} />
+            <span>New chat</span>
           </button>
-        ) : null}
+
+          {!authUser ? (
+            <button
+              className={styles.loginButton}
+              type="button"
+              onClick={() => {
+                setAuthMode("sign-in");
+                setAuthOpen(true);
+              }}
+              aria-label="Sign in"
+              title="Login"
+            >
+              <LogIn size={16} />
+              <span>Login</span>
+            </button>
+          ) : null}
+        </div>
 
         <div className={styles.accountPanel} aria-label="Account history">
           {!authUser ? (
@@ -1928,40 +1937,42 @@ export default function Home() {
           ) : null}
         </div>
 
-        <button
-          className={styles.feedbackButton}
-          type="button"
-          onClick={() => setFeedbackOpen(true)}
-          aria-label="Open feedback"
-          title="Feedback"
-        >
-          <MessageSquareHeart size={16} />
-          <span>Feedback</span>
-        </button>
+        <div className={styles.sidebarFooter}>
+          <button
+            className={styles.feedbackButton}
+            type="button"
+            onClick={() => setFeedbackOpen(true)}
+            aria-label="Open feedback"
+            title="Feedback"
+          >
+            <MessageSquareHeart size={16} />
+            <span>Feedback</span>
+          </button>
 
-        <div className={styles.statsBar} aria-label="Workspace stats">
-          <div>
-            <BarChart3 size={15} />
-            <span>Stats</span>
+          <div className={styles.statsBar} aria-label="Workspace stats">
+            <div>
+              <BarChart3 size={15} />
+              <span>Stats</span>
+            </div>
+            <dl>
+              <div>
+                <dt>Chats</dt>
+                <dd>{stats.sessions}</dd>
+              </div>
+              <div>
+                <dt>Messages</dt>
+                <dd>{stats.messages}</dd>
+              </div>
+              <div>
+                <dt>Requests</dt>
+                <dd>{stats.accessRequests}</dd>
+              </div>
+              <div>
+                <dt>Rating</dt>
+                <dd>{stats.averageRating.toFixed(1)}</dd>
+              </div>
+            </dl>
           </div>
-          <dl>
-            <div>
-              <dt>Chats</dt>
-              <dd>{stats.sessions}</dd>
-            </div>
-            <div>
-              <dt>Messages</dt>
-              <dd>{stats.messages}</dd>
-            </div>
-            <div>
-              <dt>Requests</dt>
-              <dd>{stats.accessRequests}</dd>
-            </div>
-            <div>
-              <dt>Rating</dt>
-              <dd>{stats.averageRating.toFixed(1)}</dd>
-            </div>
-          </dl>
         </div>
       </aside>
 

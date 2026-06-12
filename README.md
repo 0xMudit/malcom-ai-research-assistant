@@ -25,6 +25,7 @@ Available settings:
 ```txt
 MALCOM_MODEL=hf.co/HauhauCS/Qwen3.5-2B-Uncensored-HauhauCS-Aggressive:latest
 MALCOM_LLM_BASE_URL=http://127.0.0.1:11434
+NEXT_PUBLIC_SITE_URL=http://65.0.71.41:3000/
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
@@ -45,7 +46,7 @@ For user accounts, enable Supabase Auth email/password sign-ins in your Supabase
 After adding Supabase keys to `.env.local`, restart the dev server and check:
 
 ```txt
-http://65.0.71.41:3001/api/supabase/health
+http://65.0.71.41:3000/api/supabase/health
 ```
 
 The admin dashboard is protected by Basic Auth and includes approve, reject, and reset actions for access requests.
@@ -67,5 +68,5 @@ npm run dev
 Open:
 
 ```txt
-http://65.0.71.41:3001
+http://65.0.71.41:3000
 ```

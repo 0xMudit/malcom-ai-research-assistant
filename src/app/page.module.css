@@ -2,7 +2,7 @@
   height: 100dvh;
   min-height: 0;
   display: grid;
-  grid-template-columns: 284px minmax(0, 1fr);
+  grid-template-columns: 316px minmax(0, 1fr);
   overflow: hidden;
   color: var(--foreground);
   background:
@@ -83,18 +83,41 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  padding: 14px;
+  padding: 12px;
   border-right: 1px solid var(--sidebar-border);
-  background: var(--sidebar);
-  box-shadow: 14px 0 38px rgba(0, 0, 0, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 24%),
+    var(--sidebar);
+  box-shadow: 10px 0 34px rgba(0, 0, 0, 0.18);
   transition:
     padding 220ms ease,
     background 220ms ease,
     border-color 220ms ease;
+}
+
+.sidebarHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in oklch, var(--sidebar-border), transparent 35%);
+}
+
+.sidebarActions,
+.sidebarFooter {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sidebarFooter {
+  padding-top: 2px;
 }
 
 .brand {
@@ -157,6 +180,23 @@
 
 .shellCollapsed .brand {
   justify-content: center;
+}
+
+.shellCollapsed .sidebar {
+  align-items: center;
+  padding-inline: 10px;
+}
+
+.shellCollapsed .sidebarHeader,
+.shellCollapsed .sidebarActions,
+.shellCollapsed .sidebarFooter {
+  width: 100%;
+}
+
+.shellCollapsed .sidebarHeader {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  gap: 8px;
 }
 
 .shellCollapsed .brandText,
@@ -318,12 +358,14 @@
 .accountPanel {
   display: grid;
   gap: 12px;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden auto;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: color-mix(in oklch, var(--card), transparent 14%);
+  background: color-mix(in oklch, var(--card), transparent 12%);
+  scrollbar-width: thin;
   transition:
     opacity 180ms ease,
     transform 220ms ease,
@@ -331,8 +373,11 @@
 }
 
 .accountPanel > div:first-child {
-  display: grid;
-  gap: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
 }
 
 .accountPanel > div:first-child span {
@@ -392,7 +437,7 @@
   justify-items: start;
   gap: 4px;
   min-width: 0;
-  padding: 9px;
+  padding: 8px;
   text-align: left;
 }
 
@@ -417,7 +462,7 @@
 .sessionEditor button,
 .clearGuestButton {
   min-height: 28px;
-  padding: 0 8px;
+  padding: 0 7px;
   font-size: 11px;
 }
 
@@ -477,7 +522,8 @@
 }
 
 .upgradePrompt {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -506,8 +552,7 @@
 .statsBar {
   display: grid;
   gap: 12px;
-  margin-top: auto;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: color-mix(in oklch, var(--card), transparent 16%);
@@ -1388,7 +1433,7 @@
 
 @media (min-width: 1600px) {
   .shell {
-    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-columns: 336px minmax(0, 1fr);
   }
 
   .shellCollapsed {
@@ -1428,7 +1473,7 @@
   }
 
   .shell:not(.shellCollapsed) {
-    grid-template-columns: minmax(236px, 48vw) minmax(0, 1fr);
+    grid-template-columns: minmax(288px, 52vw) minmax(0, 1fr);
   }
 
   .sidebar {
@@ -1450,7 +1495,8 @@
   .shellCollapsed .primaryButton span,
   .shellCollapsed .loginButton span,
   .shellCollapsed .feedbackButton span,
-  .shellCollapsed .accountPanel {
+  .shellCollapsed .accountPanel,
+  .shellCollapsed .statsBar {
     display: none;
   }
 
@@ -1483,7 +1529,7 @@
   }
 
   .shell:not(.shellCollapsed) .sidebar {
-    width: min(300px, calc(100vw - 20px));
+    width: min(320px, calc(100vw - 20px));
     padding: 10px;
   }
 
@@ -1494,6 +1540,19 @@
   .shellCollapsed .feedbackButton {
     width: 34px;
     min-height: 34px;
+  }
+
+  .shellCollapsed .sidebarHeader {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .shell:not(.shellCollapsed) .sidebarHeader {
+    grid-template-columns: minmax(0, 1fr) 38px;
+  }
+
+  .shell:not(.shellCollapsed) .accountPanel {
+    display: grid;
   }
 
   .shell:not(.shellCollapsed)::before {
@@ -1585,6 +1644,11 @@
     left: 8px;
     width: 46px;
     padding: 5px;
+  }
+
+  .shell:not(.shellCollapsed) .sidebar {
+    width: calc(100vw - 16px);
+    padding: 9px;
   }
 
   .thread {

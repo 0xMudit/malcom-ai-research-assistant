@@ -2,16 +2,23 @@ import type { Metadata } from "next";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 
+const siteUrl = new URL(
+  process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "http://localhost:3000",
+);
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-  ),
+  metadataBase: siteUrl,
   title: {
-    default: "Malcom AI - Research Command",
-    template: "%s | Malcom AI",
+    default: "Malcom — AI Research Command Center",
+    template: "%s | Malcom",
   },
   description:
-    "A Supabase-dark research command interface for scientists, engineers, analysts, and field operators.",
+    "Malcom is an AI-powered research workspace for engineers, scientists, builders, and serious learners. Analyze documents, render math, review code, and synthesize technical ideas faster.",
+  alternates: {
+    canonical: "/",
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -21,10 +28,27 @@ export const metadata: Metadata = {
     apple: "/icon.svg",
   },
   openGraph: {
-    title: "Malcom AI - Research Command",
+    title: "Malcom — AI Research Command Center",
     description:
-      "A responsive research command interface for rigorous chat, math, feedback, and response review.",
-    images: ["/icon.svg"],
+      "AI-powered research workspace for documents, math, code, and technical synthesis.",
+    url: "/",
+    siteName: "Malcom",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Malcom AI research command center",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Malcom — AI Research Command Center",
+    description:
+      "AI-powered research workspace for documents, math, code, and technical synthesis.",
+    images: ["/og-image.png"],
   },
 };
 

@@ -1,6 +1,6 @@
 # Malcom
 
-Malcom is a dark research command interface for scientists, engineers, intelligence analysts, field operators, and researchers.
+Malcom is an AI-powered research workspace for engineers, scientists, builders, and serious learners. It supports document context, markdown/math rendering, code review, guest mode, saved chats, and Stripe-backed Pro and Enterprise upgrades.
 
 ## Engine
 
@@ -25,10 +25,16 @@ Available settings:
 ```txt
 MALCOM_MODEL=hf.co/HauhauCS/Qwen3.5-2B-Uncensored-HauhauCS-Aggressive:latest
 MALCOM_LLM_BASE_URL=http://127.0.0.1:11434
-NEXT_PUBLIC_SITE_URL=http://65.0.71.41:3000/
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PRICE_ID_PRO=
+STRIPE_PRICE_ID_ENTERPRISE=
 ```
 
 ## Supabase
@@ -39,14 +45,14 @@ Supabase client helpers live in `src/lib/supabase/`.
 - `createSupabaseServerClient()` returns a server-side anon client.
 - `createSupabaseAdminClient()` returns a server-only service-role client.
 
-Run `supabase/schema.sql` in your Supabase SQL editor to create the tables used by Malcom. With all three Supabase env vars set, chat history, feedback, access requests, response feedback, stats, sexual health facts, user-owned saved chats, and starred responses use Supabase. Without Supabase config, Malcom falls back to local SQLite in `data/malcom.sqlite`.
+Run `supabase/schema.sql` in your Supabase SQL editor to create the tables used by Malcom. With all three Supabase env vars set, chat history, feedback, access requests, response feedback, stats, user-owned saved chats, starred responses, documents, usage, and subscription status use Supabase. Without Supabase config, Malcom falls back to local SQLite in `data/malcom.sqlite`.
 
 For user accounts, enable Supabase Auth email/password sign-ins in your Supabase project. Signed-in users can reopen their saved chat sessions from the sidebar and star assistant responses for later review.
 
 After adding Supabase keys to `.env.local`, restart the dev server and check:
 
 ```txt
-http://65.0.71.41:3000/api/supabase/health
+http://localhost:3000/api/supabase/health
 ```
 
 The admin dashboard is protected by Basic Auth and includes approve, reject, and reset actions for access requests.
@@ -68,5 +74,5 @@ npm run dev
 Open:
 
 ```txt
-http://65.0.71.41:3000
+http://localhost:3000
 ```

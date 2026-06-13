@@ -5,6 +5,7 @@ import {
   buildSexualHealthFacts,
   targetSexualHealthFactCount,
 } from "@/lib/sexual-health-facts";
+import { planFromStripePriceId } from "@/lib/stripe";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
 import {
   createSupabaseAdminClient,
@@ -105,6 +106,41 @@ export type StoredDocument = {
   created_at: string;
 };
 
+export type PlanName = "free" | "pro" | "enterprise";
+
+export type StoredUserUsage = {
+  user_id: string;
+  period_started_at: string;
+  message_count: number;
+  cooldown_until: string | null;
+  updated_at: string;
+};
+
+export type StoredUserSubscription = {
+  user_id: string;
+  stripe_customer_id: string;
+  stripe_subscription_id: string;
+  stripe_price_id: string;
+  status: string;
+  current_period_end: string | null;
+  updated_at: string;
+};
+
+export type UserUsageStatus = {
+  plan: PlanName;
+  messagesUsed: number;
+  messagesLimit: number | null;
+  responsesRemaining: number | null;
+  cooldownUntil: string | null;
+  cooldownSecondsRemaining: number;
+  subscriptionStatus: string;
+  currentPeriodEnd: string | null;
+  isLimited: boolean;
+};
+
+export const freeMessageLimit = 100;
+export const freeCooldownMs = 5 * 60 * 60 * 1000;
+
 function getDb() {
   if (db) {
     return db;
@@ -204,6 +240,30 @@ function getDb() {
 
     CREATE INDEX IF NOT EXISTS documents_user_id_created_at_idx
       ON documents (user_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS user_usage (
+      user_id TEXT PRIMARY KEY,
+      period_started_at TEXT NOT NULL DEFAULT (datetime('now')),
+      message_count INTEGER NOT NULL DEFAULT 0,
+      cooldown_until TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS user_subscriptions (
+      user_id TEXT PRIMARY KEY,
+      stripe_customer_id TEXT NOT NULL DEFAULT '',
+      stripe_subscription_id TEXT NOT NULL DEFAULT '',
+      stripe_price_id TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'none',
+      current_period_end TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS user_subscriptions_customer_idx
+      ON user_subscriptions (stripe_customer_id);
+
+    CREATE INDEX IF NOT EXISTS user_subscriptions_subscription_idx
+      ON user_subscriptions (stripe_subscription_id);
   `);
 
   const sessionColumns = db
@@ -1215,4 +1275,454 @@ export async function deleteUserDocument(userId: string, documentId: string) {
   getDb()
     .prepare("DELETE FROM documents WHERE id = ? AND user_id = ?")
     .run(documentId, userId);
+}
+
+export async function renameUserDocument(input: {
+  userId: string;
+  documentId: string;
+  name: string;
+}) {
+  const name = input.name.slice(0, 180).trim() || "Untitled document";
+
+  if (shouldUseSupabase()) {
+    try {
+      const { error } = await createSupabaseAdminClient()
+        .from("documents")
+        .update({ name })
+        .eq("id", input.documentId)
+        .eq("user_id", input.userId);
+
+      throwOnSupabaseError(error);
+      return;
+    } catch (error) {
+      reportSupabaseError("renameUserDocument", error);
+    }
+  }
+
+  getDb()
+    .prepare("UPDATE documents SET name = ? WHERE id = ? AND user_id = ?")
+    .run(name, input.documentId, input.userId);
+}
+
+function isActiveSubscriptionStatus(status: string) {
+  return status === "active" || status === "trialing";
+}
+
+function secondsUntil(value: string | null) {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = new Date(value).getTime();
+
+  if (!Number.isFinite(timestamp)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
+}
+
+function defaultUsageRow(userId: string): StoredUserUsage {
+  const now = new Date().toISOString();
+
+  return {
+    user_id: userId,
+    period_started_at: now,
+    message_count: 0,
+    cooldown_until: null,
+    updated_at: now,
+  };
+}
+
+function normalizeUsageRow(
+  userId: string,
+  row: Partial<StoredUserUsage> | null | undefined,
+): StoredUserUsage {
+  const fallback = defaultUsageRow(userId);
+
+  return {
+    user_id: userId,
+    period_started_at:
+      typeof row?.period_started_at === "string"
+        ? row.period_started_at
+        : fallback.period_started_at,
+    message_count: Math.max(0, Number(row?.message_count || 0)),
+    cooldown_until:
+      typeof row?.cooldown_until === "string" && row.cooldown_until
+        ? row.cooldown_until
+        : null,
+    updated_at:
+      typeof row?.updated_at === "string" ? row.updated_at : fallback.updated_at,
+  };
+}
+
+function defaultSubscriptionRow(userId: string): StoredUserSubscription {
+  return {
+    user_id: userId,
+    stripe_customer_id: "",
+    stripe_subscription_id: "",
+    stripe_price_id: "",
+    status: "none",
+    current_period_end: null,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function normalizeSubscriptionRow(
+  userId: string,
+  row: Partial<StoredUserSubscription> | null | undefined,
+): StoredUserSubscription {
+  return {
+    ...defaultSubscriptionRow(userId),
+    ...row,
+    user_id: userId,
+    stripe_customer_id:
+      typeof row?.stripe_customer_id === "string"
+        ? row.stripe_customer_id
+        : "",
+    stripe_subscription_id:
+      typeof row?.stripe_subscription_id === "string"
+        ? row.stripe_subscription_id
+        : "",
+    stripe_price_id:
+      typeof row?.stripe_price_id === "string" ? row.stripe_price_id : "",
+    status: typeof row?.status === "string" && row.status ? row.status : "none",
+    current_period_end:
+      typeof row?.current_period_end === "string" && row.current_period_end
+        ? row.current_period_end
+        : null,
+    updated_at:
+      typeof row?.updated_at === "string"
+        ? row.updated_at
+        : new Date().toISOString(),
+  };
+}
+
+async function getUserUsageRow(userId: string): Promise<StoredUserUsage> {
+  if (shouldUseSupabase()) {
+    try {
+      const supabase = createSupabaseAdminClient();
+      const { data, error } = await supabase
+        .from("user_usage")
+        .select("user_id, period_started_at, message_count, cooldown_until, updated_at")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      throwOnSupabaseError(error);
+
+      if (data) {
+        return normalizeUsageRow(userId, data as StoredUserUsage);
+      }
+
+      const row = defaultUsageRow(userId);
+      const { error: insertError } = await supabase
+        .from("user_usage")
+        .upsert(row, { onConflict: "user_id" });
+
+      throwOnSupabaseError(insertError);
+      return row;
+    } catch (error) {
+      reportSupabaseError("getUserUsageRow", error);
+    }
+  }
+
+  const database = getDb();
+  const now = new Date().toISOString();
+
+  database
+    .prepare(
+      `INSERT OR IGNORE INTO user_usage (user_id, period_started_at, message_count, cooldown_until, updated_at)
+       VALUES (?, ?, 0, NULL, ?)`,
+    )
+    .run(userId, now, now);
+
+  const row = database
+    .prepare(
+      `SELECT user_id, period_started_at, message_count, cooldown_until, updated_at
+       FROM user_usage
+       WHERE user_id = ?`,
+    )
+    .get(userId) as StoredUserUsage | undefined;
+
+  return normalizeUsageRow(userId, row);
+}
+
+async function saveUserUsageRow(row: StoredUserUsage) {
+  const normalized = normalizeUsageRow(row.user_id, {
+    ...row,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (shouldUseSupabase()) {
+    try {
+      const { error } = await createSupabaseAdminClient()
+        .from("user_usage")
+        .upsert(normalized, { onConflict: "user_id" });
+
+      throwOnSupabaseError(error);
+      return;
+    } catch (error) {
+      reportSupabaseError("saveUserUsageRow", error);
+    }
+  }
+
+  getDb()
+    .prepare(
+      `INSERT INTO user_usage (user_id, period_started_at, message_count, cooldown_until, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         period_started_at = excluded.period_started_at,
+         message_count = excluded.message_count,
+         cooldown_until = excluded.cooldown_until,
+         updated_at = excluded.updated_at`,
+    )
+    .run(
+      normalized.user_id,
+      normalized.period_started_at,
+      normalized.message_count,
+      normalized.cooldown_until,
+      normalized.updated_at,
+    );
+}
+
+export async function getUserSubscription(
+  userId: string,
+): Promise<StoredUserSubscription> {
+  if (shouldUseSupabase()) {
+    try {
+      const { data, error } = await createSupabaseAdminClient()
+        .from("user_subscriptions")
+        .select(
+          "user_id, stripe_customer_id, stripe_subscription_id, stripe_price_id, status, current_period_end, updated_at",
+        )
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      throwOnSupabaseError(error);
+      return normalizeSubscriptionRow(userId, data as StoredUserSubscription);
+    } catch (error) {
+      reportSupabaseError("getUserSubscription", error);
+    }
+  }
+
+  const row = getDb()
+    .prepare(
+      `SELECT user_id, stripe_customer_id, stripe_subscription_id, stripe_price_id, status, current_period_end, updated_at
+       FROM user_subscriptions
+       WHERE user_id = ?`,
+    )
+    .get(userId) as StoredUserSubscription | undefined;
+
+  return normalizeSubscriptionRow(userId, row);
+}
+
+async function normalizeFreeUsageWindow(userId: string) {
+  const row = await getUserUsageRow(userId);
+  const cooldownRemaining = secondsUntil(row.cooldown_until);
+
+  if (row.cooldown_until && cooldownRemaining === 0) {
+    const resetRow = {
+      ...defaultUsageRow(userId),
+      period_started_at: new Date().toISOString(),
+    };
+
+    await saveUserUsageRow(resetRow);
+    return resetRow;
+  }
+
+  if (row.message_count >= freeMessageLimit && !row.cooldown_until) {
+    const limitedRow = {
+      ...row,
+      message_count: freeMessageLimit,
+      cooldown_until: new Date(Date.now() + freeCooldownMs).toISOString(),
+    };
+
+    await saveUserUsageRow(limitedRow);
+    return limitedRow;
+  }
+
+  return row;
+}
+
+export async function getUserUsageStatus(
+  userId: string,
+): Promise<UserUsageStatus> {
+  const [subscription, usage] = await Promise.all([
+    getUserSubscription(userId),
+    normalizeFreeUsageWindow(userId),
+  ]);
+  const hasPaidPlan = isActiveSubscriptionStatus(subscription.status);
+  const plan: PlanName = hasPaidPlan
+    ? planFromStripePriceId(subscription.stripe_price_id)
+    : "free";
+  const cooldownSecondsRemaining = hasPaidPlan
+    ? 0
+    : secondsUntil(usage.cooldown_until);
+  const messagesUsed = hasPaidPlan
+    ? usage.message_count
+    : Math.min(usage.message_count, freeMessageLimit);
+  const responsesRemaining = hasPaidPlan
+    ? null
+    : Math.max(0, freeMessageLimit - messagesUsed);
+
+  return {
+    plan,
+    messagesUsed,
+    messagesLimit: hasPaidPlan ? null : freeMessageLimit,
+    responsesRemaining,
+    cooldownUntil: hasPaidPlan ? null : usage.cooldown_until,
+    cooldownSecondsRemaining,
+    subscriptionStatus: subscription.status,
+    currentPeriodEnd: subscription.current_period_end,
+    isLimited: hasPaidPlan
+      ? false
+      : cooldownSecondsRemaining > 0 || messagesUsed >= freeMessageLimit,
+  };
+}
+
+export async function getUserMessageAllowance(userId: string) {
+  const status = await getUserUsageStatus(userId);
+
+  return {
+    allowed: !status.isLimited,
+    status,
+  };
+}
+
+export async function recordUserMessageUse(userId: string) {
+  const status = await getUserUsageStatus(userId);
+
+  if (status.plan !== "free" || status.isLimited) {
+    return status;
+  }
+
+  const row = await getUserUsageRow(userId);
+  const nextCount = Math.min(freeMessageLimit, row.message_count + 1);
+  const nextRow: StoredUserUsage = {
+    ...row,
+    message_count: nextCount,
+    cooldown_until:
+      nextCount >= freeMessageLimit
+        ? new Date(Date.now() + freeCooldownMs).toISOString()
+        : null,
+    updated_at: new Date().toISOString(),
+  };
+
+  await saveUserUsageRow(nextRow);
+  return getUserUsageStatus(userId);
+}
+
+export async function upsertUserSubscription(input: {
+  userId: string;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  stripePriceId?: string | null;
+  status?: string | null;
+  currentPeriodEnd?: string | null;
+}) {
+  const row = normalizeSubscriptionRow(input.userId, {
+    user_id: input.userId,
+    stripe_customer_id: input.stripeCustomerId || "",
+    stripe_subscription_id: input.stripeSubscriptionId || "",
+    stripe_price_id: input.stripePriceId || "",
+    status: input.status || "none",
+    current_period_end: input.currentPeriodEnd || null,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (shouldUseSupabase()) {
+    try {
+      const { error } = await createSupabaseAdminClient()
+        .from("user_subscriptions")
+        .upsert(row, { onConflict: "user_id" });
+
+      throwOnSupabaseError(error);
+      return;
+    } catch (error) {
+      reportSupabaseError("upsertUserSubscription", error);
+    }
+  }
+
+  getDb()
+    .prepare(
+      `INSERT INTO user_subscriptions (
+         user_id,
+         stripe_customer_id,
+         stripe_subscription_id,
+         stripe_price_id,
+         status,
+         current_period_end,
+         updated_at
+       )
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         stripe_customer_id = excluded.stripe_customer_id,
+         stripe_subscription_id = excluded.stripe_subscription_id,
+         stripe_price_id = excluded.stripe_price_id,
+         status = excluded.status,
+         current_period_end = excluded.current_period_end,
+         updated_at = excluded.updated_at`,
+    )
+    .run(
+      row.user_id,
+      row.stripe_customer_id,
+      row.stripe_subscription_id,
+      row.stripe_price_id,
+      row.status,
+      row.current_period_end,
+      row.updated_at,
+    );
+}
+
+export async function findSubscriptionOwnerByStripeIds(input: {
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+}) {
+  const customerId = input.stripeCustomerId || "";
+  const subscriptionId = input.stripeSubscriptionId || "";
+
+  if (!customerId && !subscriptionId) {
+    return null;
+  }
+
+  if (shouldUseSupabase()) {
+    try {
+      let query = createSupabaseAdminClient()
+        .from("user_subscriptions")
+        .select("user_id")
+        .limit(1);
+
+      if (subscriptionId) {
+        query = query.eq("stripe_subscription_id", subscriptionId);
+      } else {
+        query = query.eq("stripe_customer_id", customerId);
+      }
+
+      const { data, error } = await query.maybeSingle();
+      throwOnSupabaseError(error);
+
+      const userId =
+        data && typeof data.user_id === "string" ? data.user_id : "";
+
+      if (userId) {
+        return userId;
+      }
+    } catch (error) {
+      reportSupabaseError("findSubscriptionOwnerByStripeIds", error);
+    }
+  }
+
+  const row = getDb()
+    .prepare(
+      `SELECT user_id
+       FROM user_subscriptions
+       WHERE (? != '' AND stripe_subscription_id = ?)
+          OR (? != '' AND stripe_customer_id = ?)
+       LIMIT 1`,
+    )
+    .get(subscriptionId, subscriptionId, customerId, customerId) as
+    | { user_id: string }
+    | undefined;
+
+  return row?.user_id || null;
 }

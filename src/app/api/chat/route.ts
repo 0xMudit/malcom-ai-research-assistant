@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth";
-import { saveChatMessage } from "@/lib/database";
+import {
+  getUserMessageAllowance,
+  recordUserMessageUse,
+  saveChatMessage,
+} from "@/lib/database";
 
 const MODEL =
   process.env.MALCOM_MODEL ||
@@ -152,6 +156,23 @@ export async function POST(request: Request) {
       );
     }
 
+    if (user) {
+      const allowance = await getUserMessageAllowance(user.id);
+
+      if (!allowance.allowed) {
+        return NextResponse.json(
+          {
+            error:
+              allowance.status.cooldownSecondsRemaining > 0
+                ? "Your free message window is cooling down."
+                : "Your free message limit has been reached.",
+            usage: allowance.status,
+          },
+          { status: 429 },
+        );
+      }
+    }
+
     for (const message of messages) {
       await saveChatMessage({
         id: message.id,
@@ -259,8 +280,9 @@ export async function POST(request: Request) {
       content: message,
       title: latestUserMessage.content,
     });
+    const usage = user ? await recordUserMessageUse(user.id) : null;
 
-    return NextResponse.json({ id: responseId, message });
+    return NextResponse.json({ id: responseId, message, usage });
   } catch {
     return NextResponse.json(
       {

@@ -1,34 +1,36 @@
 "use client";
 
+import Link from "next/link";
 import {
   AlertCircle,
-  BarChart3,
   BookMarked,
   BrainCircuit,
+  ChevronDown,
   Check,
   CircleUserRound,
   Copy,
-  Edit3,
+  Eye,
+  EyeOff,
+  EllipsisVertical,
   FileText,
-  HardDrive,
+  FolderOpen,
   LogIn,
+  LogOut,
   MessageSquareText,
-  MessageSquareHeart,
-  Plus,
   PanelLeftClose,
   PanelLeftOpen,
+  Paperclip,
   Pin,
   PinOff,
+  Plus,
   RefreshCcw,
   Search,
   SendHorizontal,
-  Sparkles,
+  Settings,
   Star,
   ThumbsDown,
   ThumbsUp,
   Trash2,
-  UploadCloud,
-  UserRound,
   X,
 } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -36,14 +38,15 @@ import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import {
-  FormEvent,
+  type DragEvent,
+  type FormEvent,
   memo,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import styles from "./page.module.css";
 
@@ -68,6 +71,7 @@ type SavedSession = {
   pinned?: number | boolean | null;
   created_at: string;
   updated_at: string;
+  messages?: Message[];
 };
 
 type StarredResponse = {
@@ -93,15 +97,6 @@ type DocumentResource = {
   createdAt: string;
 };
 
-type AppStats = {
-  sessions: number;
-  messages: number;
-  feedback: number;
-  averageRating: number;
-  accessRequests: number;
-  responseActions: number;
-};
-
 type ResponseReaction = "like" | "dislike";
 
 type ResponseState = {
@@ -112,140 +107,69 @@ type ResponseState = {
   status?: string;
 };
 
-type StarterPrompt = {
-  title: string;
-  prompt: string;
+type AccountUsage = {
+  plan: "free" | "pro" | "enterprise";
+  messagesUsed: number;
+  messagesLimit: number | null;
+  responsesRemaining: number | null;
+  cooldownUntil: string | null;
+  cooldownSecondsRemaining: number;
+  subscriptionStatus: string;
+  currentPeriodEnd: string | null;
+  isLimited: boolean;
 };
 
-const starterPromptPool: StarterPrompt[] = [
-  {
-    title: "Unhinged summary",
-    prompt: "Explain this like a smart friend who is tired of corporate nonsense.",
-  },
-  {
-    title: "Reality check",
-    prompt: "Tell me what I am missing, what could go wrong, and what actually matters.",
-  },
-  {
-    title: "Main character plan",
-    prompt: "Turn this messy goal into a focused 7-day plan I can actually follow.",
-  },
-  {
-    title: "Hot take audit",
-    prompt: "Give me the strongest argument for and against this idea, then pick a side.",
-  },
-  {
-    title: "No-fluff roast",
-    prompt: "Critique this brutally but usefully, then tell me exactly how to fix it.",
-  },
-  {
-    title: "DM draft",
-    prompt: "Write a confident, low-cringe message for this situation.",
-  },
-  {
-    title: "Brain dump",
-    prompt: "Turn my chaotic notes into a clean answer with action items.",
-  },
-  {
-    title: "Study mode",
-    prompt: "Teach me this topic fast using examples, memory hooks, and a quick quiz.",
-  },
-  {
-    title: "Career move",
-    prompt: "Help me make this career decision with risks, upside, and next steps.",
-  },
-  {
-    title: "Vibe check",
-    prompt: "Read this situation and tell me what the signals probably mean.",
-  },
-  {
-    title: "Creator fuel",
-    prompt: "Give me 10 sharp content ideas from this topic that do not feel generic.",
-  },
-  {
-    title: "Decision boss",
-    prompt: "Compare these options and tell me the best choice for speed, risk, and payoff.",
-  },
-  {
-    title: "Receipts only",
-    prompt: "Separate facts, assumptions, and guesses in this argument.",
-  },
-  {
-    title: "Pitch glow-up",
-    prompt: "Make this pitch clearer, punchier, and harder to ignore.",
-  },
-  {
-    title: "Text decoder",
-    prompt: "Analyze this message and suggest the best reply without sounding desperate.",
-  },
-  {
-    title: "Exam clutch",
-    prompt: "Make me a last-minute study guide for this topic with the highest-yield points.",
-  },
-  {
-    title: "Startup brain",
-    prompt: "Stress-test this business idea and find the fastest way to validate it.",
-  },
-  {
-    title: "Soft skills",
-    prompt: "Help me say this honestly without sounding rude, needy, or vague.",
-  },
-  {
-    title: "Deep dive",
-    prompt: "Build a research brief from these notes and identify the unknowns.",
-  },
-  {
-    title: "Tech check",
-    prompt: "Review this system design and call out failure modes.",
-  },
-];
-
 const initialMessages: Message[] = [];
-const chatStorageKey = "malcom.chat.v2";
-const guestSessionsKey = "malcom.guest.sessions.v1";
-const guestStarsKey = "malcom.guest.stars.v1";
-const guestDocumentsKey = "malcom.guest.documents.v1";
-const startupAnimationMs = 1800;
-const factRotationMs = 5000;
-const authEmailRedirectTo =
-  process.env.NEXT_PUBLIC_SITE_URL || "http://65.0.71.41:3000/";
+const chatStorageKey = "malcom.chat.v3";
+const guestSessionsKey = "malcom.guest.sessions.v2";
+const guestStarsKey = "malcom.guest.stars.v2";
+const guestDocumentsKey = "malcom.guest.documents.v2";
+const guestUsageKey = "malcom.guest.responses.v1";
+const guestResponseLimit = 10;
+const maxUploadBytes = 2 * 1024 * 1024;
+const maxSelectedDocuments = 5;
 
-const fallbackSexualHealthFacts = [
-  "Consent works best as an active, ongoing check-in, not a one-time yes.",
-  "Open conversations about boundaries are linked with more satisfying intimate relationships.",
-  "Kissing and close touch can release oxytocin, a hormone associated with bonding and trust.",
-  "Condoms are most effective when they are stored cool, dry, and used before any genital contact.",
-  "Arousal is not the same thing as consent; clear communication matters every time.",
-  "Regular STI screening is a normal part of sexual health, even when there are no symptoms.",
-  "Stress and poor sleep can reduce libido because they affect hormones, mood, and attention.",
-  "Lubrication can reduce friction and help make sex safer and more comfortable.",
+const supportedFileExtensions = [
+  ".txt",
+  ".md",
+  ".csv",
+  ".json",
+  ".js",
+  ".jsx",
+  ".ts",
+  ".tsx",
+  ".py",
+  ".sql",
+  ".html",
+  ".css",
+  ".xml",
+  ".yaml",
+  ".yml",
+  ".log",
 ];
 
-const starterModes = [
-  {
-    name: "Study",
-    prompt: "Teach me this topic step by step, then quiz me with five questions.",
-  },
-  {
-    name: "Research",
-    prompt: "Build a concise research brief with claims, evidence, gaps, and next steps.",
-  },
-  {
-    name: "Code Review",
-    prompt: "Review this code or design for bugs, risks, and missing tests.",
-  },
-  {
-    name: "Explain",
-    prompt: "Explain this clearly with examples and no unnecessary jargon.",
-  },
-  {
-    name: "Draft",
-    prompt: "Draft this message so it is clear, direct, and polished.",
-  },
-  {
-    name: "Plan",
-    prompt: "Turn this goal into a practical plan with priorities and concrete next actions.",
-  },
+const waitingFacts = [
+  "Clear consent is easiest when people ask specific questions instead of guessing.",
+  "Desire often grows from feeling relaxed, respected, and unpressured.",
+  "Arousal is not consent; words and comfort still matter.",
+  "Good kissing is usually more about rhythm and attention than intensity.",
+  "Lubrication can make intimacy safer because it reduces friction and irritation.",
+  "Stress can lower libido because attention and hormones are pulled toward survival mode.",
+  "Many STIs have no obvious symptoms, so testing can be normal preventive care.",
+  "Talking about boundaries early usually makes intimacy feel less awkward later.",
+  "Sexual confidence often comes from communication, not from knowing every move.",
+  "A respectful no can build more trust than a reluctant yes.",
+];
+
+const welcomeMessages = [
+  "Bring the thought you cannot quite organize yet.",
+  "Ask the question that has been sitting in the back of your mind.",
+  "Drop in a rough idea, a file, or a problem. We can make it clearer.",
+  "Start with the messy version. Clarity can come next.",
+  "What should we untangle today?",
+  "Give me the spark. I will help shape it into something useful.",
+  "Curiosity is enough of a starting point.",
+  "Tell me what you want to understand, build, fix, or decide.",
 ];
 
 function createMessageId() {
@@ -256,37 +180,86 @@ function createMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function CodeBlock({ code, language }: { code: string; language: string }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copyCode() {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1400);
-    } catch {
-      setCopied(false);
-    }
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 KB";
   }
 
-  return (
-    <figure className={styles.codeBlock}>
-      <figcaption>
-        <span>{language}</span>
-        <button type="button" onClick={copyCode} aria-label="Copy code">
-          {copied ? <Check size={14} /> : <Copy size={14} />}
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </figcaption>
-      <pre>
-        <code>{code}</code>
-      </pre>
-    </figure>
-  );
+  if (bytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function formatDuration(seconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.ceil((safeSeconds % 3600) / 60);
+
+  if (hours <= 0) {
+    return `${Math.max(1, minutes)}m`;
+  }
+
+  return `${hours}h ${minutes}m`;
+}
+
+function decodeEmailFromAccessToken(accessToken: string) {
+  const [, payload] = accessToken.split(".");
+
+  if (!payload) {
+    return "";
+  }
+
+  try {
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(
+      base64.length + ((4 - (base64.length % 4)) % 4),
+      "=",
+    );
+    const claims = JSON.parse(window.atob(padded)) as { email?: unknown };
+
+    return typeof claims.email === "string" ? claims.email : "";
+  } catch {
+    return "";
+  }
+}
+
+function getAuthRedirectFromUrl() {
+  const [, rawHash = ""] = window.location.href.split("#");
+  const hash = (window.location.hash || rawHash).replace(/^#/, "");
+
+  if (!hash) {
+    return null;
+  }
+
+  const params = new URLSearchParams(hash);
+  const type = params.get("type") || "";
+
+  if (!type) {
+    return null;
+  }
+
+  const accessToken = params.get("access_token");
+
+  return {
+    type,
+    email: accessToken ? decodeEmailFromAccessToken(accessToken) : "",
+  };
+}
+
+function normalizeMath(math: string) {
+  return math
+    .replace(/\\frac_\{([^}]+)\}\{([^}]+)\}/g, "\\frac{$1}{$2}")
+    .replace(/\\frac_([A-Za-z0-9]+)\{([^}]+)\}/g, "\\frac{$1}{$2}")
+    .replace(/\\text_\{([^}]+)\}/g, "\\text{$1}")
+    .replace(/\\(hat|bar|tilde|vec)_\{([^}]+)\}/g, "\\$1{$2}")
+    .replace(/\\bar_\{([^}]+)\}/g, "\\bar{$1}");
 }
 
 function normalizeMarkdown(content: string) {
-  return normalizeBrokenMathText(content)
+  return content
+    .replace(/[\u200b-\u200d\ufeff]/g, "")
     .replace(/\r\n/g, "\n")
     .split(/(```[\s\S]*?```)/g)
     .map((segment) => {
@@ -305,23 +278,13 @@ function normalizeMarkdown(content: string) {
         )
         .replace(
           /\$\$([\s\S]*?)\$\$/g,
-          (match, math: string) => {
-            if (!math.trim()) {
-              return match;
-            }
-
-            return `$$${normalizeMath(math)}$$`;
-          },
+          (match, math: string) =>
+            math.trim() ? `$$${normalizeMath(math)}$$` : match,
         )
         .replace(
           /(?<!\$)\$([^$\n]+)\$(?!\$)/g,
-          (match, math: string) => {
-            if (!math.trim()) {
-              return match;
-            }
-
-            return `$${normalizeMath(math)}$`;
-          },
+          (match, math: string) =>
+            math.trim() ? `$${normalizeMath(math)}$` : match,
         )
         .replace(/([^\n])(\s*#{1,6}\s+)/g, "$1\n\n$2")
         .replace(/([^\n])(\s*\|[^\n]+\|\s*\n\s*\|[\s:|.-]+\|)/g, "$1\n\n$2")
@@ -331,68 +294,49 @@ function normalizeMarkdown(content: string) {
     .trim();
 }
 
-function normalizeMath(math: string) {
-  return math
-    .replace(/\\text_\{([^}]+)\}/g, "\\text{$1}")
-    .replace(/\\(hat|bar|tilde|vec)_\{([^}]+)\}/g, "\\$1{$2}")
-    .replace(/\\bar_\{([^}]+)\}/g, "\\bar{$1}")
-    .replace(/\bSE\b/g, "\\mathrm{SE}")
-    .replace(
-      /((?:\\(?:hat|bar|tilde|vec)\{[A-Za-z]\})|[A-Za-z])\{([A-Za-z0-9+\-|,:\s]+)\}/g,
-      "$1_{$2}",
-    );
-}
+function CodeBlock({ code, language }: { code: string; language: string }) {
+  const [copied, setCopied] = useState(false);
 
-function normalizeBrokenMathText(content: string) {
-  return content
-    .replace(/[\u200b-\u200d\ufeff]/g, "")
-    .replace(/\\text_\{([^}]+)\}/g, "\\text{$1}")
-    .replace(/\\(hat|bar|tilde|vec)_\{([^}]+)\}/g, "\\$1{$2}")
-    .replace(
-      /\by\s*\n\s*=\s*\n\s*m\s*\n\s*x\s*\n\s*\+\s*\n\s*c\s*\n\s*y\s*=\s*m\s*x\s*\+\s*c\b/g,
-      "$y = mx + c$",
-    )
-    .replace(/(?<!\$)\by\s*=\s*m\s*x\s*\+\s*c\b(?!\$)/g, "$y = mx + c$")
-    .replace(
-      /\(\s*x\s*\n\s*i\s*\n\s*,\s*y\s*\n\s*i\s*\n\s*\)\s*\(\s*x\s*i\s*,\s*y\s*i\s*\)/g,
-      "$(x_i, y_i)$",
-    )
-    .replace(/(?<!\$)\(\s*x_i\s*,\s*y_i\s*\)(?!\$)/g, "$(x_i, y_i)$")
-    .replace(
-      /\\text\{([^}]+)\}\s*\\hat\{([^}]+)\}\s*=\s*m\s*x\s*\+\s*c/g,
-      (_, label: string, variable: string) =>
-        `$$\\text{${label}}\\hat{${variable}} = mx + c$$`,
-    )
-    .replace(
-      /\(\s*H\s*\n\s*0\s*H\s*0\s*:\s*([^)]+)\)/g,
-      "($H_0$: $1)",
-    )
-    .replace(
-      /\bZ\s*=\s*(\\frac[\s\S]*?\\approx\s*-?\d+(?:\.\d+)?)\s+Where\b/g,
-      "\n\n$$Z = $1$$\n\nWhere",
-    )
-    .replace(
-      /S\s*\n\s*E\s*\n\s*SE\s*\(Standard Error\)/g,
-      "$SE$ (Standard Error)",
-    )
-    .replace(
-      /s\s*\n\s*d\s*\n\s*i\s*\n\s*f\s*\n\s*f\s*≈\s*(-?\d+(?:\.\d+)?)/g,
-      "$s_{diff} \\approx $1$",
-    )
-    .replace(/s\s+diff\s*≈\s*(-?\d+(?:\.\d+)?)/g, "$s_{diff} \\approx $1$");
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <figure className={styles.codeBlock}>
+      <figcaption>
+        <span>{language || "text"}</span>
+        <button type="button" onClick={copyCode} aria-label="Copy code">
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </figcaption>
+      <pre>
+        <code>{code}</code>
+      </pre>
+    </figure>
+  );
 }
 
 const markdownComponents: Components = {
+  a({ children, href }) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer">
+        {children}
+      </a>
+    );
+  },
   code({ className, children }) {
-    const language = /language-(\w+)/.exec(className || "")?.[1];
+    const rawCode = String(children).replace(/\n$/, "");
+    const language = /language-(\w+)/.exec(className || "")?.[1] || "";
 
-    if (language) {
-      return (
-        <CodeBlock
-          code={String(children).replace(/\n$/, "")}
-          language={language}
-        />
-      );
+    if (language || rawCode.includes("\n")) {
+      return <CodeBlock code={rawCode} language={language || "text"} />;
     }
 
     return <code>{children}</code>;
@@ -420,6 +364,59 @@ function MessageContent({ content }: { content: string }) {
       </ReactMarkdown>
     </div>
   );
+}
+
+function readJsonArray<T>(key: string): T[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const value = window.localStorage.getItem(key);
+    const parsed = value ? JSON.parse(value) : [];
+
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeJsonArray<T>(key: string, value: T[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Guest storage is best-effort. Chat still works without it.
+  }
+}
+
+function readGuestUsage() {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  try {
+    const value = Number(window.localStorage.getItem(guestUsageKey) || 0);
+
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeGuestUsage(value: number) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(guestUsageKey, String(Math.max(0, value)));
+  } catch {
+    // Keep in-memory usage if localStorage is unavailable.
+  }
 }
 
 function loadStoredChat(): StoredChat {
@@ -454,30 +451,9 @@ function loadStoredChat(): StoredChat {
   }
 }
 
-function readJsonArray<T>(key: string): T[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const value = window.localStorage.getItem(key);
-    const parsed = value ? JSON.parse(value) : [];
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeJsonArray<T>(key: string, value: T[]) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(key, JSON.stringify(value));
-}
-
 function chatTitle(messages: Message[]) {
   const firstUser = messages.find((message) => message.role === "user");
+
   return firstUser?.content.slice(0, 80).trim() || "Untitled";
 }
 
@@ -486,12 +462,10 @@ function saveGuestSession(sessionId: string, messages: Message[]) {
     return;
   }
 
-  const sessions = readJsonArray<SavedSession & { messages?: Message[] }>(
-    guestSessionsKey,
-  );
+  const sessions = readJsonArray<SavedSession>(guestSessionsKey);
   const existing = sessions.find((session) => session.id === sessionId);
   const now = new Date().toISOString();
-  const nextSession = {
+  const nextSession: SavedSession = {
     id: sessionId,
     title: existing?.title || chatTitle(messages),
     folder: existing?.folder || "",
@@ -507,6 +481,18 @@ function saveGuestSession(sessionId: string, messages: Message[]) {
     [nextSession, ...sessions.filter((session) => session.id !== sessionId)]
       .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)))
       .slice(0, 50),
+  );
+}
+
+function isSupportedFile(file: File) {
+  const type = file.type.toLowerCase();
+  const name = file.name.toLowerCase();
+
+  return (
+    type.startsWith("text/") ||
+    type === "application/json" ||
+    type === "application/xml" ||
+    supportedFileExtensions.some((extension) => name.endsWith(extension))
   );
 }
 
@@ -529,22 +515,36 @@ function UserAvatar() {
   );
 }
 
-function getRandomStarterPrompts(count = 4) {
-  return [...starterPromptPool]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, count);
-}
-
-function formatBytes(bytes: number) {
-  if (!Number.isFinite(bytes) || bytes <= 0) {
-    return "0 KB";
+function PlanBadge({
+  authUser,
+  usage,
+  guestUsed,
+}: {
+  authUser: User | null;
+  usage: AccountUsage | null;
+  guestUsed: number;
+}) {
+  if (!authUser) {
+    return (
+      <span className={styles.planBadge}>
+        Guest · {guestUsed}/{guestResponseLimit}
+      </span>
+    );
   }
 
-  if (bytes < 1024 * 1024) {
-    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (usage?.plan === "enterprise") {
+    return <span className={styles.planBadge}>Enterprise</span>;
   }
 
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (usage?.plan === "pro") {
+    return <span className={styles.planBadge}>Pro</span>;
+  }
+
+  return (
+    <span className={styles.planBadge}>
+      Free · {usage?.messagesUsed ?? 0}/{usage?.messagesLimit ?? 100}
+    </span>
+  );
 }
 
 const MessageItem = memo(function MessageItem({
@@ -648,11 +648,11 @@ const MessageItem = memo(function MessageItem({
                   onChange={(event) =>
                     onCommentChange(message.id, event.target.value)
                   }
-                  placeholder="Write a comment on this response..."
+                  placeholder="Add a note to this response..."
                   rows={3}
                 />
                 <button type="button" onClick={() => onSubmitComment(message.id)}>
-                  Save comment
+                  Save note
                 </button>
               </div>
             ) : null}
@@ -674,82 +674,69 @@ export default function Home() {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isStarting, setIsStarting] = useState(true);
   const [hasLoadedStoredChat, setHasLoadedStoredChat] = useState(false);
-  const [stats, setStats] = useState<AppStats>({
-    sessions: 0,
-    messages: 0,
-    feedback: 0,
-    averageRating: 0,
-    accessRequests: 0,
-    responseActions: 0,
-  });
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [feedbackName, setFeedbackName] = useState("");
-  const [feedbackEmail, setFeedbackEmail] = useState("");
-  const [feedbackRating, setFeedbackRating] = useState(5);
-  const [feedbackSuggestion, setFeedbackSuggestion] = useState("");
-  const [feedbackStatus, setFeedbackStatus] = useState("");
-  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
-  const [accessOpen, setAccessOpen] = useState(false);
-  const [accessName, setAccessName] = useState("");
-  const [accessEmail, setAccessEmail] = useState("");
-  const [accessStatus, setAccessStatus] = useState("");
-  const [isSubmittingAccess, setIsSubmittingAccess] = useState(false);
-  const [starterPrompts, setStarterPrompts] = useState(() =>
-    starterPromptPool.slice(0, 4),
-  );
-  const [factQueue, setFactQueue] = useState(fallbackSexualHealthFacts);
-  const [factCursor, setFactCursor] = useState(0);
-  const [factVisible, setFactVisible] = useState(true);
   const [responseStates, setResponseStates] = useState<
     Record<string, ResponseState>
   >({});
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState("");
+  const [accountUsage, setAccountUsage] = useState<AccountUsage | null>(null);
+  const [guestUsed, setGuestUsed] = useState(0);
+  const [limitOpen, setLimitOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [authPasswordVisible, setAuthPasswordVisible] = useState(false);
   const [authStatus, setAuthStatus] = useState("");
   const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+  const [deleteSessionId, setDeleteSessionId] = useState("");
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
+  const [guestSessions, setGuestSessions] = useState<SavedSession[]>([]);
   const [starredResponses, setStarredResponses] = useState<StarredResponse[]>(
     [],
   );
-  const [historyStatus, setHistoryStatus] = useState("");
-  const [guestSessions, setGuestSessions] = useState<
-    (SavedSession & { messages?: Message[] })[]
-  >([]);
-  const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile>({
     display_name: "",
     memory: "",
   });
-  const [profileStatus, setProfileStatus] = useState("");
+  const [historyStatus, setHistoryStatus] = useState("");
   const [historyQuery, setHistoryQuery] = useState("");
+  const [openSessionMenuId, setOpenSessionMenuId] = useState("");
+  const [openLibraryPanel, setOpenLibraryPanel] = useState<
+    "documents" | "starred" | "pinned" | ""
+  >("");
   const [editingSessionId, setEditingSessionId] = useState("");
   const [editingTitle, setEditingTitle] = useState("");
-  const [editingFolder, setEditingFolder] = useState("");
-  const [editingTags, setEditingTags] = useState("");
+  const [editingDocumentId, setEditingDocumentId] = useState("");
+  const [editingDocumentName, setEditingDocumentName] = useState("");
   const [documents, setDocuments] = useState<DocumentResource[]>([]);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [documentStatus, setDocumentStatus] = useState("");
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [loadingNoteIndex, setLoadingNoteIndex] = useState(0);
+  const [welcomeMessageIndex, setWelcomeMessageIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const requestTokenRef = useRef(0);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const factQueueRef = useRef(fallbackSexualHealthFacts);
   const supabaseRef = useRef<SupabaseClient | null>(null);
+  const authConfirmationHandledRef = useRef(false);
 
+  const activeSessions = authUser ? savedSessions : guestSessions;
+  const selectedDocuments = useMemo(
+    () =>
+      selectedDocumentIds
+        .map((id) => documents.find((document) => document.id === id))
+        .filter((document): document is DocumentResource => Boolean(document)),
+    [documents, selectedDocumentIds],
+  );
   const starredMessageIds = useMemo(
     () => new Set(starredResponses.map((response) => response.message_id)),
     [starredResponses],
   );
-  const activeSessions = authUser ? savedSessions : guestSessions;
   const filteredSessions = useMemo(() => {
     const query = historyQuery.trim().toLowerCase();
 
@@ -767,29 +754,24 @@ export default function Home() {
   const pinnedSessions = filteredSessions.filter((session) =>
     Boolean(session.pinned),
   );
-  const unpinnedSessions = filteredSessions.filter(
+  const recentSessions = filteredSessions.filter(
     (session) => !Boolean(session.pinned),
   );
-  const showUpgradePrompt =
-    !authUser &&
-    hasLoadedStoredChat &&
-    (messages.filter((message) => message.role === "user").length >= 3 ||
-      starredResponses.length > 0);
-
-  const visiblePrompt = useMemo(
-    () => messages.length === 0 && input.trim().length === 0,
-    [input, messages.length],
-  );
-  const selectedDocuments = useMemo(
-    () =>
-      selectedDocumentIds
-        .map((id) => documents.find((document) => document.id === id))
-        .filter((document): document is DocumentResource => Boolean(document)),
-    [documents, selectedDocumentIds],
-  );
+  const guestRemaining = Math.max(0, guestResponseLimit - guestUsed);
+  const isGuestLimited = !authUser && guestRemaining <= 0;
+  const isFreeLimited = Boolean(authUser && accountUsage?.isLimited);
+  const isComposerDisabled = isSending || isGuestLimited || isFreeLimited;
+  const visiblePrompt = messages.length === 0 && input.trim().length === 0;
+  const usageSummary = authUser
+    ? accountUsage?.plan === "enterprise"
+      ? "Enterprise plan · highest limits"
+      : accountUsage?.plan === "pro"
+        ? "Pro plan · higher limits"
+      : `${accountUsage?.messagesUsed ?? 0}/${accountUsage?.messagesLimit ?? 100} free messages used`
+    : `Guest responses: ${guestUsed}/${guestResponseLimit} used`;
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(max-width: 760px)");
+    const mediaQuery = window.matchMedia("(max-width: 820px)");
     const syncSidebar = () => setSidebarCollapsed(mediaQuery.matches);
 
     syncSidebar();
@@ -799,26 +781,21 @@ export default function Home() {
       const stored = loadStoredChat();
       setSessionId(stored.sessionId);
       setMessages(stored.messages);
-      setGuestSessions(readJsonArray(guestSessionsKey));
-      setStarredResponses(readJsonArray(guestStarsKey));
+      setGuestSessions(readJsonArray<SavedSession>(guestSessionsKey));
+      setStarredResponses(readJsonArray<StarredResponse>(guestStarsKey));
       setDocuments(readJsonArray<DocumentResource>(guestDocumentsKey));
+      setGuestUsed(readGuestUsage());
       setHasLoadedStoredChat(true);
-      setStarterPrompts(getRandomStarterPrompts());
     }, 0);
-
-    const startupTimer = window.setTimeout(
-      () => setIsStarting(false),
-      startupAnimationMs,
-    );
 
     return () => {
       mediaQuery.removeEventListener("change", syncSidebar);
       window.clearTimeout(loadTimer);
-      window.clearTimeout(startupTimer);
     };
   }, []);
 
   useEffect(() => {
+    const authRedirect = getAuthRedirectFromUrl();
     const supabase = createSupabaseBrowserClient();
     supabaseRef.current = supabase;
 
@@ -826,7 +803,46 @@ export default function Home() {
       return;
     }
 
+    if (
+      authRedirect?.type === "signup" &&
+      authRedirect.email &&
+      !authConfirmationHandledRef.current
+    ) {
+      authConfirmationHandledRef.current = true;
+      setAuthMode("sign-in");
+      setAuthEmail(authRedirect.email);
+      setAuthStatus(
+        "Account confirmed. Enter your password to finish signing in.",
+      );
+      setAuthOpen(true);
+      window.history.replaceState(
+        null,
+        document.title,
+        `${window.location.pathname}${window.location.search}`,
+      );
+      void supabase.auth.signOut({ scope: "local" });
+    }
+
+    if (
+      (authRedirect?.type === "recovery" || authRedirect?.type === "invite") &&
+      !authConfirmationHandledRef.current
+    ) {
+      authConfirmationHandledRef.current = true;
+      setAuthMode("sign-in");
+      setAuthStatus("Your email was verified. Sign in to continue.");
+      setAuthOpen(true);
+      window.history.replaceState(
+        null,
+        document.title,
+        `${window.location.pathname}${window.location.search}`,
+      );
+    }
+
     void supabase.auth.getSession().then(({ data }) => {
+      if (authRedirect?.type === "signup") {
+        return;
+      }
+
       setAuthUser(data.session?.user || null);
       setAccessToken(data.session?.access_token || "");
     });
@@ -839,7 +855,9 @@ export default function Home() {
 
       if (!session) {
         setSavedSessions([]);
-        setStarredResponses([]);
+        setAccountUsage(null);
+        setStarredResponses(readJsonArray<StarredResponse>(guestStarsKey));
+        setDocuments(readJsonArray<DocumentResource>(guestDocumentsKey));
       }
     });
 
@@ -853,8 +871,9 @@ export default function Home() {
 
     void refreshUserWorkspace(accessToken);
     void refreshDocuments(accessToken);
+    void refreshUsage(accessToken);
     void syncGuestStars(accessToken);
-    // refreshUserWorkspace is intentionally read from the latest render here.
+    // These functions intentionally read the latest render state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser, accessToken]);
 
@@ -871,27 +890,22 @@ export default function Home() {
       return;
     }
 
-    window.localStorage.setItem(
-      chatStorageKey,
-      JSON.stringify({ sessionId, messages }),
-    );
+    try {
+      window.localStorage.setItem(
+        chatStorageKey,
+        JSON.stringify({ sessionId, messages }),
+      );
+    } catch {
+      // Local storage is optional for guest mode.
+    }
 
     if (!authUser) {
       saveGuestSession(sessionId, messages);
-      // localStorage is the external source of truth for guest history.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setGuestSessions(readJsonArray(guestSessionsKey));
+      window.setTimeout(() => {
+        setGuestSessions(readJsonArray<SavedSession>(guestSessionsKey));
+      }, 0);
     }
   }, [authUser, hasLoadedStoredChat, messages, sessionId]);
-
-  useEffect(() => {
-    void refreshStats();
-    void refreshFactQueue();
-  }, []);
-
-  useEffect(() => {
-    factQueueRef.current = factQueue;
-  }, [factQueue]);
 
   useEffect(() => {
     const thread = threadRef.current;
@@ -911,54 +925,51 @@ export default function Home() {
       return;
     }
 
-    let fadeTimer: number | undefined;
     const timer = window.setInterval(() => {
-      setFactVisible(false);
-      fadeTimer = window.setTimeout(() => {
-        setFactCursor((current) => {
-          const queueLength = factQueueRef.current.length;
+      setLoadingNoteIndex((current) => (current + 1) % waitingFacts.length);
+    }, 5000);
 
-          if (queueLength < 2) {
-            return current;
-          }
-
-          const next = current + 1;
-
-          if (next >= queueLength) {
-            void refreshFactQueue();
-            return 0;
-          }
-
-          return next;
-        });
-        setFactVisible(true);
-      }, 180);
-    }, factRotationMs);
-
-    return () => {
-      window.clearInterval(timer);
-
-      if (fadeTimer) {
-        window.clearTimeout(fadeTimer);
-      }
-    };
+    return () => window.clearInterval(timer);
   }, [isSending]);
 
-  async function refreshStats() {
-    try {
-      const response = await fetch("/api/stats", { cache: "no-store" });
-      const data = (await response.json()) as AppStats;
-
-      if (response.ok) {
-        setStats(data);
-      }
-    } catch {
-      // Stats are secondary UI; chat should keep working if this fails.
+  useEffect(() => {
+    if (!visiblePrompt) {
+      return;
     }
-  }
+
+    const timer = window.setInterval(() => {
+      setWelcomeMessageIndex(
+        (current) => (current + 1) % welcomeMessages.length,
+      );
+    }, 3600);
+
+    return () => window.clearInterval(timer);
+  }, [visiblePrompt]);
 
   function authHeaders(token = accessToken): Record<string, string> {
     return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async function refreshUsage(token = accessToken) {
+    if (!token) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/user/usage", {
+        cache: "no-store",
+        headers: authHeaders(token),
+      });
+      const data = (await response.json()) as {
+        usage?: AccountUsage;
+      };
+
+      if (response.ok && data.usage) {
+        setAccountUsage(data.usage);
+      }
+    } catch {
+      // Usage is displayed defensively; server-side chat limits still apply.
+    }
   }
 
   async function refreshUserWorkspace(token = accessToken) {
@@ -969,20 +980,21 @@ export default function Home() {
     setHistoryStatus("");
 
     try {
-      const [sessionsResponse, starredResponse, profileResponse] = await Promise.all([
-        fetch("/api/user/chats", {
-          cache: "no-store",
-          headers: authHeaders(token),
-        }),
-        fetch("/api/user/starred-responses", {
-          cache: "no-store",
-          headers: authHeaders(token),
-        }),
-        fetch("/api/user/profile", {
-          cache: "no-store",
-          headers: authHeaders(token),
-        }),
-      ]);
+      const [sessionsResponse, starredResponse, profileResponse] =
+        await Promise.all([
+          fetch("/api/user/chats", {
+            cache: "no-store",
+            headers: authHeaders(token),
+          }),
+          fetch("/api/user/starred-responses", {
+            cache: "no-store",
+            headers: authHeaders(token),
+          }),
+          fetch("/api/user/profile", {
+            cache: "no-store",
+            headers: authHeaders(token),
+          }),
+        ]);
 
       if (!sessionsResponse.ok || !starredResponse.ok || !profileResponse.ok) {
         throw new Error("Could not load account history.");
@@ -1034,6 +1046,18 @@ export default function Home() {
   }
 
   async function uploadDocument(file: File) {
+    if (file.size > maxUploadBytes) {
+      setDocumentStatus(`${file.name} is too large. Max size is 2 MB.`);
+      return;
+    }
+
+    if (!isSupportedFile(file)) {
+      setDocumentStatus(
+        `${file.name} is not supported. Use text, Markdown, CSV, JSON, code, or logs.`,
+      );
+      return;
+    }
+
     setDocumentStatus("");
     setIsUploadingDocument(true);
 
@@ -1059,11 +1083,13 @@ export default function Home() {
         data.document as DocumentResource,
         ...current.filter((document) => document.id !== data.document?.id),
       ]);
-      setSelectedDocumentIds((current) => [
-        data.document!.id,
-        ...current.filter((id) => id !== data.document!.id),
-      ].slice(0, 5));
-      setDocumentStatus("Document ready for chat.");
+      setSelectedDocumentIds((current) =>
+        [
+          data.document!.id,
+          ...current.filter((id) => id !== data.document!.id),
+        ].slice(0, maxSelectedDocuments),
+      );
+      setDocumentStatus("Attached to this conversation.");
     } catch (caughtError) {
       setDocumentStatus(
         caughtError instanceof Error
@@ -1079,11 +1105,29 @@ export default function Home() {
     }
   }
 
+  async function handleFiles(files: FileList | File[]) {
+    const nextFiles = Array.from(files).slice(0, maxSelectedDocuments);
+
+    if (!nextFiles.length) {
+      return;
+    }
+
+    for (const file of nextFiles) {
+      await uploadDocument(file);
+    }
+  }
+
+  function handleDrop(event: DragEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsDragActive(false);
+    void handleFiles(event.dataTransfer.files);
+  }
+
   function toggleSelectedDocument(id: string) {
     setSelectedDocumentIds((current) =>
       current.includes(id)
         ? current.filter((item) => item !== id)
-        : [id, ...current].slice(0, 5),
+        : [id, ...current].slice(0, maxSelectedDocuments),
     );
   }
 
@@ -1105,7 +1149,68 @@ export default function Home() {
     }
   }
 
+  function beginEditDocument(document: DocumentResource) {
+    setEditingDocumentId(document.id);
+    setEditingDocumentName(document.name);
+  }
+
+  async function saveDocumentEdits() {
+    if (!editingDocumentId) {
+      return;
+    }
+
+    const nextName =
+      editingDocumentName.slice(0, 180).trim() || "Untitled document";
+
+    setDocuments((current) =>
+      current.map((document) =>
+        document.id === editingDocumentId
+          ? { ...document, name: nextName }
+          : document,
+      ),
+    );
+
+    if (!accessToken) {
+      setEditingDocumentId("");
+      setEditingDocumentName("");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/documents", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify({
+          id: editingDocumentId,
+          name: nextName,
+        }),
+      });
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error || "Document was not renamed.");
+      }
+
+      setDocumentStatus("Document renamed.");
+    } catch (caughtError) {
+      setDocumentStatus(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Document was not renamed.",
+      );
+      await refreshDocuments();
+    } finally {
+      setEditingDocumentId("");
+      setEditingDocumentName("");
+    }
+  }
+
   async function openSavedChat(nextSessionId: string) {
+    setOpenSessionMenuId("");
+
     if (!accessToken) {
       const session = guestSessions.find((item) => item.id === nextSessionId);
 
@@ -1140,7 +1245,13 @@ export default function Home() {
       }
 
       setSessionId(nextSessionId);
-      setMessages(data.messages || []);
+      setMessages(
+        (data.messages || []).map((message) => ({
+          id: message.id,
+          role: message.role,
+          content: message.content,
+        })),
+      );
       setResponseStates({});
       setError("");
       setHistoryStatus("");
@@ -1185,17 +1296,14 @@ export default function Home() {
   function beginEditSession(session: SavedSession) {
     setEditingSessionId(session.id);
     setEditingTitle(session.title);
-    setEditingFolder(session.folder || "");
-    setEditingTags(session.tags || "");
+    setOpenSessionMenuId("");
   }
 
   function updateGuestSession(
     nextSessionId: string,
     patch: Partial<SavedSession>,
   ) {
-    const sessions = readJsonArray<SavedSession & { messages?: Message[] }>(
-      guestSessionsKey,
-    ).map((session) =>
+    const sessions = readJsonArray<SavedSession>(guestSessionsKey).map((session) =>
       session.id === nextSessionId
         ? { ...session, ...patch, updated_at: new Date().toISOString() }
         : session,
@@ -1210,12 +1318,10 @@ export default function Home() {
       return;
     }
 
+    const nextTitle = editingTitle.slice(0, 80).trim() || "Untitled";
+
     if (!accessToken) {
-      updateGuestSession(editingSessionId, {
-        title: editingTitle.slice(0, 80).trim() || "Untitled",
-        folder: editingFolder,
-        tags: editingTags,
-      });
+      updateGuestSession(editingSessionId, { title: nextTitle });
       setEditingSessionId("");
       return;
     }
@@ -1228,9 +1334,7 @@ export default function Home() {
       },
       body: JSON.stringify({
         sessionId: editingSessionId,
-        title: editingTitle,
-        folder: editingFolder,
-        tags: editingTags,
+        title: nextTitle,
       }),
     });
     setEditingSessionId("");
@@ -1239,6 +1343,7 @@ export default function Home() {
 
   async function togglePinnedSession(session: SavedSession) {
     const nextPinned = !Boolean(session.pinned);
+    setOpenSessionMenuId("");
 
     if (!accessToken) {
       updateGuestSession(session.id, { pinned: nextPinned });
@@ -1256,15 +1361,11 @@ export default function Home() {
     await refreshUserWorkspace();
   }
 
-  async function deleteSession(nextSessionId: string) {
-    if (!window.confirm("Delete this chat?")) {
-      return;
-    }
-
+  async function confirmDeleteSession(nextSessionId: string) {
     if (!accessToken) {
-      const sessions = readJsonArray<SavedSession & { messages?: Message[] }>(
-        guestSessionsKey,
-      ).filter((session) => session.id !== nextSessionId);
+      const sessions = readJsonArray<SavedSession>(guestSessionsKey).filter(
+        (session) => session.id !== nextSessionId,
+      );
       writeJsonArray(guestSessionsKey, sessions);
       setGuestSessions(sessions);
 
@@ -1286,47 +1387,9 @@ export default function Home() {
     }
   }
 
-  function clearGuestData() {
-    window.localStorage.removeItem(chatStorageKey);
-    window.localStorage.removeItem(guestSessionsKey);
-    window.localStorage.removeItem(guestStarsKey);
-    window.localStorage.removeItem(guestDocumentsKey);
-    setGuestSessions([]);
-    setStarredResponses([]);
-    setDocuments([]);
-    setSelectedDocumentIds([]);
-    startNewChat();
-  }
-
-  async function saveProfile() {
-    if (!accessToken) {
-      return;
-    }
-
-    setProfileStatus("Saving...");
-
-    try {
-      const response = await fetch("/api/user/profile", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(),
-        },
-        body: JSON.stringify({
-          displayName: profile.display_name,
-          memory: profile.memory,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Profile was not saved.");
-      }
-
-      setProfileStatus("Saved.");
-      window.setTimeout(() => setProfileStatus(""), 1200);
-    } catch {
-      setProfileStatus("Could not save profile.");
-    }
+  function deleteSession(nextSessionId: string) {
+    setOpenSessionMenuId("");
+    setDeleteSessionId(nextSessionId);
   }
 
   async function submitAuth(event: FormEvent<HTMLFormElement>) {
@@ -1343,23 +1406,63 @@ export default function Home() {
     setAuthStatus("");
 
     try {
-      const authCall =
-        authMode === "sign-up"
-          ? supabase.auth.signUp({
-              email: authEmail.trim(),
-              password: authPassword,
-              options: {
-                emailRedirectTo: authEmailRedirectTo,
-              },
-            })
-          : supabase.auth.signInWithPassword({
-              email: authEmail.trim(),
-              password: authPassword,
-            });
-      const { data, error: authError } = await authCall;
+      let data: { user: User | null; session: Session | null };
 
-      if (authError) {
-        throw authError;
+      if (authMode === "sign-up") {
+        const response = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: authEmail.trim(),
+            password: authPassword,
+          }),
+        });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          const errorMessage = payload.error || "Account could not be created.";
+
+          if (/already|registered|exists/i.test(errorMessage)) {
+            setAuthMode("sign-in");
+            setAuthPassword("");
+            setAuthStatus(
+              "You are already registered. Enter your password to log in.",
+            );
+            return;
+          }
+
+          throw new Error(errorMessage);
+        }
+
+        data = {
+          user: payload.user || null,
+          session: payload.session || null,
+        };
+
+        const identities = Array.isArray(payload.user?.identities)
+          ? payload.user.identities
+          : null;
+
+        if (!data.session && identities && identities.length === 0) {
+          setAuthMode("sign-in");
+          setAuthPassword("");
+          setAuthStatus(
+            "You are already registered. Enter your password to log in.",
+          );
+          return;
+        }
+      } else {
+        const { data: authData, error: authError } =
+          await supabase.auth.signInWithPassword({
+            email: authEmail.trim(),
+            password: authPassword,
+          });
+
+        if (authError) {
+          throw authError;
+        }
+
+        data = authData;
       }
 
       setAuthUser(data.user || data.session?.user || null);
@@ -1388,40 +1491,22 @@ export default function Home() {
     setAuthUser(null);
     setAccessToken("");
     setSavedSessions([]);
-    setStarredResponses(readJsonArray(guestStarsKey));
+    setAccountUsage(null);
+    setStarredResponses(readJsonArray<StarredResponse>(guestStarsKey));
     setDocuments(readJsonArray<DocumentResource>(guestDocumentsKey));
     setSelectedDocumentIds([]);
     setProfile({ display_name: "", memory: "" });
-    setProfileOpen(false);
-  }
-
-  async function refreshFactQueue() {
-    try {
-      const response = await fetch("/api/sexual-health-facts?limit=80", {
-        cache: "no-store",
-      });
-      const data = (await response.json()) as {
-        facts?: { id?: number; fact?: string }[];
-      };
-      const facts =
-        data.facts
-          ?.map((item) => item.fact)
-          .filter((fact): fact is string => Boolean(fact?.trim())) || [];
-
-      if (response.ok && facts.length > 0) {
-        setFactQueue(facts);
-        setFactCursor(0);
-        factQueueRef.current = facts;
-      }
-    } catch {
-      // The local fallback keeps the loading card useful if the DB route fails.
-    }
   }
 
   async function sendMessage(nextInput = input, baseMessages = messages) {
     const prompt = nextInput.trim();
 
     if (!prompt || isSending) {
+      return;
+    }
+
+    if (isGuestLimited || isFreeLimited) {
+      setLimitOpen(true);
       return;
     }
 
@@ -1441,10 +1526,9 @@ export default function Home() {
     setMessages(pendingMessages);
     setInput("");
     setError("");
-    setFactCursor(0);
-    setFactVisible(true);
+    setLimitOpen(false);
     setIsSending(true);
-    void refreshFactQueue();
+    setLoadingNoteIndex(0);
 
     try {
       const response = await fetch("/api/chat", {
@@ -1473,10 +1557,21 @@ export default function Home() {
         id?: string;
         message?: string;
         error?: string;
+        usage?: AccountUsage;
       };
 
       if (!response.ok) {
-        throw new Error(data.error || "Malcom could not reach the intelligence engine.");
+        setMessages(baseMessages);
+        setInput(prompt);
+
+        if (data.usage) {
+          setAccountUsage(data.usage);
+          setLimitOpen(response.status === 429);
+        }
+
+        throw new Error(
+          data.error || "Malcom could not reach the intelligence engine.",
+        );
       }
 
       if (requestToken !== requestTokenRef.current || controller.signal.aborted) {
@@ -1491,9 +1586,19 @@ export default function Home() {
           content: data.message || "No response was returned by the model.",
         },
       ]);
-      playResponsePing();
-      void refreshStats();
-      void refreshUserWorkspace();
+
+      if (authUser) {
+        if (data.usage) {
+          setAccountUsage(data.usage);
+        } else {
+          void refreshUsage();
+        }
+        void refreshUserWorkspace();
+      } else {
+        const nextGuestUsed = Math.min(guestResponseLimit, guestUsed + 1);
+        setGuestUsed(nextGuestUsed);
+        writeGuestUsage(nextGuestUsed);
+      }
     } catch (caughtError) {
       if (
         caughtError instanceof DOMException &&
@@ -1506,13 +1611,13 @@ export default function Home() {
         caughtError instanceof Error
           ? caughtError.message
           : "Unexpected intelligence engine error.";
+
       if (requestToken === requestTokenRef.current) {
         setError(message);
       }
     } finally {
       if (requestToken === requestTokenRef.current) {
         setIsSending(false);
-        setFactVisible(true);
         abortRef.current = null;
         requestAnimationFrame(() => textareaRef.current?.focus());
       }
@@ -1525,18 +1630,19 @@ export default function Home() {
   }
 
   function startNewChat() {
+    setOpenSessionMenuId("");
     abortRef.current?.abort();
     abortRef.current = null;
     requestTokenRef.current += 1;
     setIsSending(false);
-    const nextSessionId = createMessageId();
-    setSessionId(nextSessionId);
+    setSessionId(createMessageId());
     setMessages(initialMessages);
     setResponseStates({});
-    window.localStorage.removeItem(chatStorageKey);
     setInput("");
     setError("");
-    setStarterPrompts(getRandomStarterPrompts());
+    setDocumentStatus("");
+    setSelectedDocumentIds([]);
+    window.localStorage.removeItem(chatStorageKey);
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
@@ -1548,60 +1654,6 @@ export default function Home() {
         ...patch,
       },
     }));
-  }
-
-  async function saveResponseAction(
-    messageId: string,
-    reaction: ResponseReaction | "comment",
-    comment = "",
-  ) {
-    const response = await fetch("/api/response-feedback", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ messageId, reaction, comment }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Response action was not saved.");
-    }
-  }
-
-  function playResponsePing() {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const AudioContextClass = window.AudioContext;
-
-    if (!AudioContextClass) {
-      return;
-    }
-
-    const audioContext =
-      audioContextRef.current || new AudioContextClass({ latencyHint: "interactive" });
-    audioContextRef.current = audioContext;
-
-    if (audioContext.state === "suspended") {
-      void audioContext.resume();
-    }
-
-    const now = audioContext.currentTime;
-    const oscillator = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(740, now);
-    oscillator.frequency.exponentialRampToValueAtTime(980, now + 0.08);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.045, now + 0.018);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-
-    oscillator.connect(gain);
-    gain.connect(audioContext.destination);
-    oscillator.start(now);
-    oscillator.stop(now + 0.17);
   }
 
   function copyWithFallback(content: string) {
@@ -1635,6 +1687,24 @@ export default function Home() {
     }
   }
 
+  async function saveResponseAction(
+    messageId: string,
+    reaction: ResponseReaction | "comment",
+    comment = "",
+  ) {
+    const response = await fetch("/api/response-feedback", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ messageId, reaction, comment }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Response action was not saved.");
+    }
+  }
+
   async function reactToResponse(id: string, reaction: ResponseReaction) {
     patchResponseState(id, { reaction, status: "Saved" });
 
@@ -1652,33 +1722,18 @@ export default function Home() {
     const nextStarred = !starredMessageIds.has(id);
     patchResponseState(id, { status: nextStarred ? "Starred" : "Unstarred" });
 
-    if (nextStarred) {
-      setStarredResponses((current) => [
-        {
-          id,
-          message_id: id,
-          session_id: sessionId,
-          content,
-          created_at: new Date().toISOString(),
-        },
-        ...current.filter((response) => response.message_id !== id),
-      ]);
-    } else {
-      setStarredResponses((current) =>
-        current.filter((response) => response.message_id !== id),
-      );
-    }
+    const nextStar = {
+      id,
+      message_id: id,
+      session_id: sessionId,
+      content,
+      created_at: new Date().toISOString(),
+    };
 
     if (!accessToken) {
       const nextStars = nextStarred
         ? [
-            {
-              id,
-              message_id: id,
-              session_id: sessionId,
-              content,
-              created_at: new Date().toISOString(),
-            },
+            nextStar,
             ...starredResponses.filter((response) => response.message_id !== id),
           ]
         : starredResponses.filter((response) => response.message_id !== id);
@@ -1708,11 +1763,10 @@ export default function Home() {
         throw new Error("Star was not saved.");
       }
 
-      void refreshUserWorkspace();
+      await refreshUserWorkspace();
       window.setTimeout(() => patchResponseState(id, { status: "" }), 1200);
     } catch {
       patchResponseState(id, { status: "Could not save star" });
-      void refreshUserWorkspace();
     }
   }
 
@@ -1735,7 +1789,7 @@ export default function Home() {
     const comment = responseStates[id]?.comment?.trim() || "";
 
     if (!comment) {
-      patchResponseState(id, { status: "Write a comment first" });
+      patchResponseState(id, { status: "Write a note first" });
       return;
     }
 
@@ -1746,18 +1800,18 @@ export default function Home() {
       patchResponseState(id, {
         comment: "",
         commenting: false,
-        status: "Comment saved",
+        status: "Note saved",
       });
       window.setTimeout(() => patchResponseState(id, { status: "" }), 1200);
     } catch {
-      patchResponseState(id, { status: "Could not save comment" });
+      patchResponseState(id, { status: "Could not save note" });
     }
   }
 
   function regenerateResponse(id: string) {
     const responseIndex = messages.findIndex((message) => message.id === id);
 
-    if (responseIndex < 1 || isSending) {
+    if (responseIndex < 1 || isSending || isComposerDisabled) {
       return;
     }
 
@@ -1774,90 +1828,65 @@ export default function Home() {
     void sendMessage(previousUser.content, priorMessages.slice(0, -1));
   }
 
-  async function submitFeedback(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFeedbackStatus("");
-    setIsSubmittingFeedback(true);
-
-    try {
-      const response = await fetch("/api/feedback", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: feedbackName,
-          email: feedbackEmail,
-          rating: feedbackRating,
-          suggestion: feedbackSuggestion,
-        }),
-      });
-      const data = (await response.json()) as { error?: string };
-
-      if (!response.ok) {
-        throw new Error(data.error || "Feedback was not saved.");
-      }
-
-      setFeedbackStatus("Feedback saved.");
-      setFeedbackName("");
-      setFeedbackEmail("");
-      setFeedbackRating(5);
-      setFeedbackSuggestion("");
-      void refreshStats();
-      window.setTimeout(() => setFeedbackOpen(false), 700);
-    } catch (caughtError) {
-      setFeedbackStatus(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Feedback was not saved.",
-      );
-    } finally {
-      setIsSubmittingFeedback(false);
-    }
+  function focusComposer() {
+    requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
-  async function submitAccessRequest(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAccessStatus("");
+  function openAuth(mode: "sign-in" | "sign-up") {
+    setAuthMode(mode);
+    setAuthStatus("");
+    setAuthOpen(true);
+  }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(accessEmail.trim())) {
-      setAccessStatus("Enter a valid email address.");
-      return;
-    }
+  function renderSessionRow(session: SavedSession, metaText?: string) {
+    const isMenuOpen = openSessionMenuId === session.id;
+    const isPinned = Boolean(session.pinned);
+    const sessionMeta =
+      metaText || new Date(session.updated_at).toLocaleDateString();
 
-    setIsSubmittingAccess(true);
-
-    try {
-      const response = await fetch("/api/access-request", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: accessName,
-          email: accessEmail,
-        }),
-      });
-      const data = (await response.json()) as { error?: string };
-
-      if (!response.ok) {
-        throw new Error(data.error || "Access request was not saved.");
-      }
-
-      setAccessStatus("Request saved. The admin can review it now.");
-      setAccessName("");
-      setAccessEmail("");
-      void refreshStats();
-      window.setTimeout(() => setAccessOpen(false), 900);
-    } catch (caughtError) {
-      setAccessStatus(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Access request was not saved.",
-      );
-    } finally {
-      setIsSubmittingAccess(false);
-    }
+    return (
+      <article key={session.id} className={styles.sessionRow}>
+        <button
+          className={styles.sessionOpenButton}
+          type="button"
+          onClick={() => void openSavedChat(session.id)}
+        >
+          <span>{session.title}</span>
+          <time>{sessionMeta}</time>
+        </button>
+        <div className={styles.sessionActions}>
+          <button
+            type="button"
+            onClick={() =>
+              setOpenSessionMenuId((current) =>
+                current === session.id ? "" : session.id,
+              )
+            }
+            aria-label={`Open actions for ${session.title}`}
+            aria-expanded={isMenuOpen}
+            title="Chat actions"
+          >
+            <EllipsisVertical size={15} />
+          </button>
+          {isMenuOpen ? (
+            <div className={styles.sessionMenu}>
+              <button type="button" onClick={() => void togglePinnedSession(session)}>
+                {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+                <span>{isPinned ? "Unpin" : "Pin"}</span>
+              </button>
+              <button type="button" onClick={() => beginEditSession(session)}>
+                <FileText size={14} />
+                <span>Rename</span>
+              </button>
+              <button type="button" onClick={() => void deleteSession(session.id)}>
+                <Trash2 size={14} />
+                <span>Delete</span>
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </article>
+    );
   }
 
   return (
@@ -1866,33 +1895,20 @@ export default function Home() {
         sidebarCollapsed ? styles.shellCollapsed : ""
       }`}
     >
-      {isStarting ? (
-        <section className={styles.startup} aria-label="Starting Malcom">
-          <div className={styles.startupFrame}>
-            <div className={styles.startupLogo} aria-hidden="true">
-              <BrainCircuit size={38} />
-            </div>
-            <div className={styles.startupCopy}>
-              <p>Welcome to Malcom</p>
-              <span>Research command is ready</span>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      <aside className={styles.sidebar} aria-label="Conversation navigation">
+      <aside className={styles.sidebar} aria-label="Malcom navigation">
         <div className={styles.sidebarHeader}>
-          <div className={styles.brand}>
+          <button
+            className={styles.brand}
+            type="button"
+            onClick={focusComposer}
+            aria-label="Focus Malcom prompt"
+          >
             <MalcomAvatar active />
-            <div className={styles.brandText}>
-              <h1>Malcom</h1>
-              <p className={styles.developerCredit}>
-                <span>Developed by</span>
-                <strong>Muditya Raghav</strong>
-                <a href="mailto:0xMudit@gmail.com">0xMudit@gmail.com</a>
-              </p>
-            </div>
-          </div>
+            <span>
+              <strong>Malcom</strong>
+              <small>Research workspace</small>
+            </span>
+          </button>
 
           <button
             className={styles.iconButton}
@@ -1908,291 +1924,228 @@ export default function Home() {
         <div className={styles.sidebarActions}>
           <button className={styles.primaryButton} type="button" onClick={startNewChat}>
             <Plus size={16} />
-            <span>New chat</span>
+            <span>New Chat</span>
           </button>
 
           {!authUser ? (
             <button
-              className={styles.loginButton}
+              className={styles.secondaryButton}
               type="button"
-              onClick={() => {
-                setAuthMode("sign-in");
-                setAuthOpen(true);
-              }}
-              aria-label="Sign in"
-              title="Login"
+              onClick={() => openAuth("sign-up")}
             >
               <LogIn size={16} />
-              <span>Login</span>
+              <span>Sign up free</span>
             </button>
           ) : null}
         </div>
 
-        <div className={styles.accountPanel} aria-label="Account history">
-          {!authUser ? (
-            <div className={styles.workspaceCard}>
-              <div className={styles.workspaceIcon} aria-hidden="true">
-                <HardDrive size={17} />
-              </div>
-              <div>
-                <span>Guest workspace</span>
-                <p>Stored on this device</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode("sign-up");
-                  setAuthOpen(true);
-                }}
-              >
-                Sign up
-              </button>
+        <div className={styles.sidebarScroll}>
+          <div className={styles.workspacePanel}>
+            <div>
+              <PlanBadge authUser={authUser} usage={accountUsage} guestUsed={guestUsed} />
+              <p>
+                {authUser
+                  ? profile.display_name || authUser.email || "Synced account"
+                  : "Guest chats stay on this device."}
+              </p>
             </div>
-          ) : (
-            <div className={styles.workspaceCard}>
-              <div className={styles.workspaceIcon} aria-hidden="true">
-                <UserRound size={17} />
-              </div>
-              <div>
-                <span>{profile.display_name || authUser.email || "Workspace"}</span>
-                <p>Synced account</p>
-              </div>
-              <button type="button" onClick={() => setProfileOpen(true)}>
-                Profile
+            {!authUser ? (
+              <button type="button" onClick={() => openAuth("sign-in")}>
+                Log in
               </button>
-              <button
-                className={styles.iconMiniButton}
-                type="button"
-                onClick={() => void refreshUserWorkspace()}
-                aria-label="Refresh workspace"
-                title="Refresh"
-              >
-                <RefreshCcw size={13} />
+            ) : (
+              <button type="button" onClick={() => void signOut()}>
+                <LogOut size={14} />
               </button>
-            </div>
-          )}
-
-          {historyStatus ? <p>{historyStatus}</p> : null}
-          {showUpgradePrompt && !authUser ? (
-            <div className={styles.upgradePrompt}>
-              <span>Stored on this device</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode("sign-up");
-                  setAuthOpen(true);
-                }}
-              >
-                Sync
-              </button>
-            </div>
-          ) : null}
+            )}
+          </div>
 
           <label className={styles.historySearch}>
             <Search size={14} aria-hidden="true" />
             <input
               value={historyQuery}
               onChange={(event) => setHistoryQuery(event.target.value)}
-              placeholder="Search chats, folders, tags"
+              placeholder="Search chats"
             />
           </label>
 
+          {historyStatus ? <p className={styles.sidebarStatus}>{historyStatus}</p> : null}
+
           <section className={styles.navSection}>
             <div className={styles.navSectionHeader}>
-              <FileText size={13} aria-hidden="true" />
-              <h2>Documents</h2>
-              <span>{documents.length}</span>
+              <FolderOpen size={14} aria-hidden="true" />
+              <h2>Library</h2>
             </div>
-            <input
-              ref={documentInputRef}
-              className={styles.fileInput}
-              type="file"
-              accept=".txt,.md,.csv,.json,.js,.jsx,.ts,.tsx,.py,.sql,.html,.css,.xml,.yaml,.yml,.log,text/*,application/json"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
 
-                if (file) {
-                  void uploadDocument(file);
+            <div className={styles.libraryGrid}>
+              <button
+                type="button"
+                onClick={() =>
+                  setOpenLibraryPanel((current) =>
+                    current === "documents" ? "" : "documents",
+                  )
                 }
-              }}
-            />
-            <button
-              className={styles.uploadButton}
-              type="button"
-              onClick={() => documentInputRef.current?.click()}
-              disabled={isUploadingDocument}
-            >
-              <UploadCloud size={14} />
-              <span>{isUploadingDocument ? "Uploading" : "Upload file"}</span>
-            </button>
-            {documentStatus ? (
-              <p className={styles.emptyNavText}>{documentStatus}</p>
+                aria-expanded={openLibraryPanel === "documents"}
+              >
+                <FileText size={14} />
+                <span>Documents</span>
+                {documents.length ? <strong>{documents.length}</strong> : null}
+                <ChevronDown
+                  className={
+                    openLibraryPanel === "documents" ? styles.libraryIconOpen : ""
+                  }
+                  size={14}
+                />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setOpenLibraryPanel((current) =>
+                    current === "starred" ? "" : "starred",
+                  )
+                }
+                aria-expanded={openLibraryPanel === "starred"}
+              >
+                <BookMarked size={14} />
+                <span>Starred</span>
+                {starredResponses.length ? (
+                  <strong>{starredResponses.length}</strong>
+                ) : null}
+                <ChevronDown
+                  className={
+                    openLibraryPanel === "starred" ? styles.libraryIconOpen : ""
+                  }
+                  size={14}
+                />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setOpenLibraryPanel((current) =>
+                    current === "pinned" ? "" : "pinned",
+                  )
+                }
+                aria-expanded={openLibraryPanel === "pinned"}
+              >
+                <Pin size={14} />
+                <span>Pinned</span>
+                {pinnedSessions.length ? <strong>{pinnedSessions.length}</strong> : null}
+                <ChevronDown
+                  className={
+                    openLibraryPanel === "pinned" ? styles.libraryIconOpen : ""
+                  }
+                  size={14}
+                />
+              </button>
+            </div>
+
+            {openLibraryPanel === "documents" ? (
+              <div className={styles.libraryPanel}>
+                {documents.length ? (
+                  <div className={styles.documentList}>
+                    {documents.slice(0, 5).map((document) => {
+                      const selected = selectedDocumentIds.includes(document.id);
+
+                      return (
+                        <article
+                          key={document.id}
+                          className={`${styles.documentRow} ${
+                            selected ? styles.documentSelected : ""
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectedDocument(document.id)}
+                            aria-pressed={selected}
+                          >
+                            <span>{document.name}</span>
+                            <time>{formatBytes(document.size)}</time>
+                          </button>
+                          <div className={styles.documentActions}>
+                            <button
+                              type="button"
+                              onClick={() => beginEditDocument(document)}
+                              aria-label={`Rename ${document.name}`}
+                              title="Rename"
+                            >
+                              <FileText size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteDocument(document.id)}
+                              aria-label={`Delete ${document.name}`}
+                              title="Delete"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className={styles.sidebarStatus}>No documents yet.</p>
+                )}
+              </div>
             ) : null}
-            <div className={styles.documentList}>
-              {documents.length ? (
-                documents.slice(0, 8).map((document) => {
-                  const selected = selectedDocumentIds.includes(document.id);
 
-                  return (
-                    <article
-                      key={document.id}
-                      className={`${styles.documentRow} ${
-                        selected ? styles.documentSelected : ""
-                      }`}
-                    >
+            {openLibraryPanel === "starred" ? (
+              <div className={styles.libraryPanel}>
+                {starredResponses.length ? (
+                  <div className={styles.starredList}>
+                    {starredResponses.slice(0, 5).map((response) => (
                       <button
+                        key={response.id}
                         type="button"
-                        onClick={() => toggleSelectedDocument(document.id)}
-                        aria-pressed={selected}
+                        onClick={() => void copyResponse(response.message_id, response.content)}
+                        title="Copy starred response"
                       >
-                        <span>{document.name}</span>
-                        <time>{formatBytes(document.size)}</time>
+                        <BookMarked size={13} />
+                        <span>{response.content.slice(0, 90)}</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => void deleteDocument(document.id)}
-                        aria-label={`Delete ${document.name}`}
-                        title="Delete"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </article>
-                  );
-                })
-              ) : (
-                <p className={styles.emptyNavText}>
-                  Upload text, Markdown, CSV, JSON, code, or logs.
-                </p>
-              )}
-            </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={styles.sidebarStatus}>No starred responses yet.</p>
+                )}
+              </div>
+            ) : null}
+
+            {openLibraryPanel === "pinned" ? (
+              <div className={styles.libraryPanel}>
+                {pinnedSessions.length ? (
+                  <div className={styles.historyList}>
+                    {pinnedSessions
+                      .slice(0, 4)
+                      .map((session) => renderSessionRow(session, "Pinned"))}
+                  </div>
+                ) : (
+                  <p className={styles.sidebarStatus}>No pinned chats yet.</p>
+                )}
+              </div>
+            ) : null}
           </section>
 
           <section className={styles.navSection}>
             <div className={styles.navSectionHeader}>
-              <Pin size={13} aria-hidden="true" />
-              <h2>Pinned</h2>
-              <span>{pinnedSessions.length}</span>
+              <MessageSquareText size={14} aria-hidden="true" />
+              <h2>Chats</h2>
             </div>
-            <div className={styles.historyList}>
-              {pinnedSessions.length ? (
-                pinnedSessions.slice(0, 5).map((session) => (
-                  <article key={session.id} className={styles.sessionRow}>
-                    <button
-                      className={styles.sessionOpenButton}
-                      type="button"
-                      onClick={() => void openSavedChat(session.id)}
-                    >
-                      <span>{session.title}</span>
-                      <time>{session.folder || session.tags || "Pinned"}</time>
-                    </button>
-                    <div className={styles.sessionActions}>
-                      <button
-                        type="button"
-                        onClick={() => void togglePinnedSession(session)}
-                        aria-label={`Unpin ${session.title}`}
-                        title="Unpin"
-                      >
-                        <PinOff size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => beginEditSession(session)}
-                        aria-label={`Edit ${session.title}`}
-                        title="Edit"
-                      >
-                        <Edit3 size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void deleteSession(session.id)}
-                        aria-label={`Delete ${session.title}`}
-                        title="Delete"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <p className={styles.emptyNavText}>No pinned chats.</p>
-              )}
-            </div>
-          </section>
 
-          <section className={styles.navSection}>
-            <div className={styles.navSectionHeader}>
-              <MessageSquareText size={13} aria-hidden="true" />
-              <h2>{authUser ? "Saved chats" : "Guest chats"}</h2>
-              <span>{unpinnedSessions.length}</span>
-            </div>
             <div className={styles.historyList}>
-              {unpinnedSessions.length ? (
-                unpinnedSessions.slice(0, 10).map((session) => (
-                  <article key={session.id} className={styles.sessionRow}>
-                    <button
-                      className={styles.sessionOpenButton}
-                      type="button"
-                      onClick={() => void openSavedChat(session.id)}
-                    >
-                      <span>{session.title}</span>
-                      <time>
-                        {[session.folder, session.tags].filter(Boolean).join(" / ") ||
-                          new Date(session.updated_at).toLocaleDateString()}
-                      </time>
-                    </button>
-                    <div className={styles.sessionActions}>
-                      <button
-                        type="button"
-                        onClick={() => void togglePinnedSession(session)}
-                        aria-label={`Pin ${session.title}`}
-                        title="Pin"
-                      >
-                        <Pin size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => beginEditSession(session)}
-                        aria-label={`Edit ${session.title}`}
-                        title="Edit"
-                      >
-                        <Edit3 size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void deleteSession(session.id)}
-                        aria-label={`Delete ${session.title}`}
-                        title="Delete"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <p className={styles.emptyNavText}>
-                  {authUser ? "No saved chats yet." : "No guest chats yet."}
-                </p>
-              )}
+              {recentSessions
+                .slice(0, 10)
+                .map((session) => renderSessionRow(session))}
             </div>
           </section>
 
           {editingSessionId ? (
             <section className={styles.sessionEditor}>
-              <h2>Edit chat</h2>
+              <h2>Rename chat</h2>
               <input
                 value={editingTitle}
                 onChange={(event) => setEditingTitle(event.target.value)}
-                placeholder="Title"
-              />
-              <input
-                value={editingFolder}
-                onChange={(event) => setEditingFolder(event.target.value)}
-                placeholder="Folder"
-              />
-              <input
-                value={editingTags}
-                onChange={(event) => setEditingTags(event.target.value)}
-                placeholder="Tags"
+                placeholder="Chat title"
               />
               <div>
                 <button type="button" onClick={() => void saveSessionEdits()}>
@@ -2205,74 +2158,37 @@ export default function Home() {
             </section>
           ) : null}
 
-          <section className={styles.navSection}>
-            <div className={styles.navSectionHeader}>
-              <BookMarked size={13} aria-hidden="true" />
-              <h2>Starred</h2>
-              <span>{starredResponses.length}</span>
-            </div>
-            <div className={styles.historyList}>
-              {starredResponses.length ? (
-                starredResponses.slice(0, 8).map((response) => (
-                  <button
-                    className={styles.starredButton}
-                    key={response.message_id}
-                    type="button"
-                    onClick={() => void openSavedChat(response.session_id)}
-                  >
-                    <span>{response.content.slice(0, 80)}</span>
-                    <time>{new Date(response.created_at).toLocaleDateString()}</time>
-                  </button>
-                ))
-              ) : (
-                <p className={styles.emptyNavText}>No starred responses yet.</p>
-              )}
-            </div>
-          </section>
-
-          {!authUser ? (
-            <button className={styles.clearGuestButton} type="button" onClick={clearGuestData}>
-              Clear local chats
-            </button>
+          {editingDocumentId ? (
+            <section className={styles.sessionEditor}>
+              <h2>Rename document</h2>
+              <input
+                value={editingDocumentName}
+                onChange={(event) => setEditingDocumentName(event.target.value)}
+                placeholder="Document name"
+              />
+              <div>
+                <button type="button" onClick={() => void saveDocumentEdits()}>
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingDocumentId("");
+                    setEditingDocumentName("");
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </section>
           ) : null}
         </div>
 
         <div className={styles.sidebarFooter}>
-          <button
-            className={styles.feedbackButton}
-            type="button"
-            onClick={() => setFeedbackOpen(true)}
-            aria-label="Open feedback"
-            title="Feedback"
-          >
-            <MessageSquareHeart size={16} />
-            <span>Feedback</span>
-          </button>
-
-          <div className={styles.statsBar} aria-label="Workspace stats">
-            <div>
-              <BarChart3 size={15} />
-              <span>Stats</span>
-            </div>
-            <dl>
-              <div>
-                <dt>Chats</dt>
-                <dd>{stats.sessions}</dd>
-              </div>
-              <div>
-                <dt>Messages</dt>
-                <dd>{stats.messages}</dd>
-              </div>
-              <div>
-                <dt>Requests</dt>
-                <dd>{stats.accessRequests}</dd>
-              </div>
-              <div>
-                <dt>Rating</dt>
-                <dd>{stats.averageRating.toFixed(1)}</dd>
-              </div>
-            </dl>
-          </div>
+          <Link href="/settings">
+            <Settings size={15} />
+            <span>Settings</span>
+          </Link>
         </div>
       </aside>
 
@@ -2280,37 +2196,9 @@ export default function Home() {
         <div className={styles.thread} ref={threadRef} aria-live="polite">
           {visiblePrompt ? (
             <section className={styles.emptyState}>
-              <div className={styles.emptyMark}>
-                <BrainCircuit size={28} />
-              </div>
-              <h2>What should Malcom help with?</h2>
-              <p>
-                Built for scientists, engineers, intelligence teams, and researchers
-                who need rigorous synthesis, technical review, and operational clarity.
+              <p key={welcomeMessageIndex} className={styles.welcomeLine}>
+                {welcomeMessages[welcomeMessageIndex]}
               </p>
-              <div className={styles.modeBar} aria-label="Starter modes">
-                {starterModes.map((mode) => (
-                  <button
-                    key={mode.name}
-                    type="button"
-                    onClick={() => setInput(mode.prompt)}
-                  >
-                    {mode.name}
-                  </button>
-                ))}
-              </div>
-              <div className={styles.suggestions}>
-                {starterPrompts.map((item) => (
-                  <button
-                    key={item.prompt}
-                    type="button"
-                    onClick={() => void sendMessage(item.prompt)}
-                  >
-                    <span>{item.title}</span>
-                    {item.prompt}
-                  </button>
-                ))}
-              </div>
             </section>
           ) : null}
 
@@ -2336,7 +2224,7 @@ export default function Home() {
               <div className={styles.messageBody}>
                 <span>Malcom</span>
                 <div className={styles.thinking} aria-label="Malcom is working">
-                  <strong>Malcom is working</strong>
+                  <strong>Working on it</strong>
                   <div
                     className={styles.progressTrack}
                     role="progressbar"
@@ -2344,14 +2232,7 @@ export default function Home() {
                   >
                     <span />
                   </div>
-                  <p className={styles.factLabel}>Sexual health fact</p>
-                  <p
-                    className={`${styles.factText} ${
-                      factVisible ? styles.factTextVisible : ""
-                    }`}
-                  >
-                    {factQueue[factCursor] || fallbackSexualHealthFacts[0]}
-                  </p>
+                  <p>{waitingFacts[loadingNoteIndex]}</p>
                 </div>
               </div>
             </article>
@@ -2359,6 +2240,40 @@ export default function Home() {
         </div>
 
         <div className={styles.composerWrap}>
+          {limitOpen || isGuestLimited || isFreeLimited ? (
+            <div className={styles.limitCard}>
+              <AlertCircle size={16} />
+              <div>
+                <strong>
+                  {isGuestLimited
+                    ? "You have used your 10 guest responses."
+                    : "Your free message window is cooling down."}
+                </strong>
+                <p>
+                  {isGuestLimited
+                    ? "Create a free account to continue and save chats across devices."
+                    : `Cooldown ends in ${formatDuration(
+                        accountUsage?.cooldownSecondsRemaining || 0,
+                      )}. Upgrade to Pro for higher limits.`}
+                </p>
+              </div>
+              <div>
+                {!authUser ? (
+                  <>
+                    <button type="button" onClick={() => openAuth("sign-in")}>
+                      Login
+                    </button>
+                    <button type="button" onClick={() => openAuth("sign-up")}>
+                      Register
+                    </button>
+                  </>
+                ) : (
+                  <Link href="/settings">Open settings</Link>
+                )}
+              </div>
+            </div>
+          ) : null}
+
           {selectedDocuments.length ? (
             <div className={styles.attachmentStrip} aria-label="Attached documents">
               {selectedDocuments.map((document) => (
@@ -2370,6 +2285,7 @@ export default function Home() {
                 >
                   <FileText size={14} />
                   <span>{document.name}</span>
+                  <small>{formatBytes(document.size)}</small>
                   <X size={13} />
                 </button>
               ))}
@@ -2383,104 +2299,85 @@ export default function Home() {
             </p>
           ) : null}
 
-          <form className={styles.composer} onSubmit={handleSubmit}>
-            <textarea
-              ref={textareaRef}
-              aria-label="Message Malcom"
-              placeholder="Message Malcom..."
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void sendMessage();
+          {documentStatus ? (
+            <p className={styles.documentStatus}>{documentStatus}</p>
+          ) : null}
+
+          <form
+            className={`${styles.composer} ${
+              isDragActive ? styles.composerDragging : ""
+            }`}
+            onSubmit={handleSubmit}
+            onDrop={handleDrop}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setIsDragActive(true);
+            }}
+            onDragLeave={() => setIsDragActive(false)}
+          >
+            <input
+              ref={documentInputRef}
+              className={styles.fileInput}
+              type="file"
+              multiple
+              accept=".txt,.md,.csv,.json,.js,.jsx,.ts,.tsx,.py,.sql,.html,.css,.xml,.yaml,.yml,.log,text/*,application/json"
+              onChange={(event) => {
+                if (event.target.files) {
+                  void handleFiles(event.target.files);
                 }
               }}
-              rows={1}
             />
-            <button type="submit" disabled={isSending || !input.trim()}>
-              <SendHorizontal size={17} />
-              <span>{isSending ? "Sending" : "Send"}</span>
-            </button>
+            <div className={styles.composerTop}>
+              <textarea
+                ref={textareaRef}
+                aria-label="Ask Malcom"
+                placeholder="Ask Malcom to analyze, explain, code, compare, or summarize..."
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void sendMessage();
+                  }
+                }}
+                disabled={isComposerDisabled}
+                rows={2}
+              />
+            </div>
+            <div className={styles.composerBottom}>
+              <button
+                className={styles.attachButton}
+                type="button"
+                onClick={() => documentInputRef.current?.click()}
+                disabled={isUploadingDocument || isComposerDisabled}
+              >
+                <Paperclip size={15} />
+                <span>{isUploadingDocument ? "Uploading" : "Attach"}</span>
+              </button>
+              <p>
+                Supports text, Markdown, CSV, JSON, code files, and logs. Max 2
+                MB each.
+              </p>
+              <span className={styles.shortcutHint}>
+                Enter to send · Shift+Enter for new line
+              </span>
+              <button
+                className={styles.sendButton}
+                type="submit"
+                disabled={isComposerDisabled || !input.trim()}
+              >
+                <SendHorizontal size={17} />
+                <span>{isSending ? "Sending" : "Send"}</span>
+              </button>
+            </div>
           </form>
+
+          <div className={styles.composerMeta}>
+            <span>{usageSummary}</span>
+            <span>Uploaded files are used only for this conversation.</span>
+          </div>
         </div>
       </section>
-
-      {profileOpen ? (
-        <div
-          className={styles.dialogBackdrop}
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setProfileOpen(false);
-            }
-          }}
-        >
-          <section
-            className={styles.feedbackDialog}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="profile-title"
-          >
-            <div className={styles.dialogHeader}>
-              <div>
-                <p>{authUser?.email}</p>
-                <h2 id="profile-title">Profile memory</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setProfileOpen(false)}
-                aria-label="Close profile"
-              >
-                <X size={17} />
-              </button>
-            </div>
-
-            <div className={styles.feedbackForm}>
-              <label>
-                <span>Display name</span>
-                <input
-                  value={profile.display_name}
-                  onChange={(event) =>
-                    setProfile((current) => ({
-                      ...current,
-                      display_name: event.target.value,
-                    }))
-                  }
-                  placeholder="Name Malcom should use"
-                />
-              </label>
-              <label>
-                <span>Memory</span>
-                <textarea
-                  value={profile.memory}
-                  onChange={(event) =>
-                    setProfile((current) => ({
-                      ...current,
-                      memory: event.target.value,
-                    }))
-                  }
-                  placeholder="Preferences, recurring context, response style, or work focus"
-                  rows={6}
-                />
-              </label>
-
-              {profileStatus ? (
-                <p className={styles.feedbackStatus}>{profileStatus}</p>
-              ) : null}
-
-              <button type="button" onClick={() => void saveProfile()}>
-                Save profile
-              </button>
-              <div className={styles.authSwitch}>
-                <button type="button" onClick={() => void signOut()}>
-                  Sign out
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      ) : null}
 
       {authOpen ? (
         <div
@@ -2493,7 +2390,7 @@ export default function Home() {
           }}
         >
           <section
-            className={styles.feedbackDialog}
+            className={styles.dialog}
             role="dialog"
             aria-modal="true"
             aria-labelledby="auth-title"
@@ -2502,7 +2399,7 @@ export default function Home() {
               <div>
                 <p>Account</p>
                 <h2 id="auth-title">
-                  {authMode === "sign-up" ? "Create account" : "Sign in"}
+                  {authMode === "sign-up" ? "Create account" : "Log in"}
                 </h2>
               </div>
               <button
@@ -2514,7 +2411,7 @@ export default function Home() {
               </button>
             </div>
 
-            <form className={styles.feedbackForm} onSubmit={submitAuth}>
+            <form className={styles.dialogForm} onSubmit={submitAuth}>
               <label>
                 <span>Email</span>
                 <input
@@ -2528,26 +2425,35 @@ export default function Home() {
               </label>
               <label>
                 <span>Password</span>
-                <input
-                  required
-                  type="password"
-                  minLength={6}
-                  value={authPassword}
-                  onChange={(event) => setAuthPassword(event.target.value)}
-                  placeholder="Password"
-                />
+                <div className={styles.passwordField}>
+                  <input
+                    required
+                    type={authPasswordVisible ? "text" : "password"}
+                    minLength={6}
+                    value={authPassword}
+                    onChange={(event) => setAuthPassword(event.target.value)}
+                    placeholder="Password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAuthPasswordVisible((current) => !current)}
+                    aria-label={
+                      authPasswordVisible ? "Hide password" : "Show password"
+                    }
+                    title={authPasswordVisible ? "Hide password" : "Show password"}
+                  >
+                    {authPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </label>
-
-              {authStatus ? (
-                <p className={styles.feedbackStatus}>{authStatus}</p>
-              ) : null}
+              {authStatus ? <p className={styles.dialogStatus}>{authStatus}</p> : null}
 
               <button type="submit" disabled={isSubmittingAuth}>
                 {isSubmittingAuth
                   ? "Working..."
                   : authMode === "sign-up"
                     ? "Create account"
-                    : "Sign in"}
+                    : "Log in"}
               </button>
 
               <div className={styles.authSwitch}>
@@ -2563,184 +2469,66 @@ export default function Home() {
                     ? "Create an account"
                     : "I already have an account"}
                 </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {deleteSessionId ? (
+        <div
+          className={styles.dialogBackdrop}
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setDeleteSessionId("");
+            }
+          }}
+        >
+          <section
+            className={styles.dialog}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-chat-title"
+          >
+            <div className={styles.dialogHeader}>
+              <div>
+                <p>Chat</p>
+                <h2 id="delete-chat-title">Delete this chat?</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteSessionId("")}
+                aria-label="Close delete confirmation"
+              >
+                <X size={17} />
+              </button>
+            </div>
+            <div className={styles.dialogForm}>
+              <p className={styles.dialogStatus}>
+                This removes the chat from your history.
+              </p>
+              <div className={styles.authSwitch}>
+                <button type="button" onClick={() => setDeleteSessionId("")}>
+                  Cancel
+                </button>
                 <button
                   type="button"
+                  className={styles.dangerAction}
                   onClick={() => {
-                    setAuthOpen(false);
-                    setAccessOpen(true);
+                    const nextSessionId = deleteSessionId;
+                    setDeleteSessionId("");
+                    void confirmDeleteSession(nextSessionId);
                   }}
                 >
-                  Request access
+                  Delete
                 </button>
               </div>
-            </form>
-          </section>
-        </div>
-      ) : null}
-
-      {feedbackOpen ? (
-        <div
-          className={styles.dialogBackdrop}
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setFeedbackOpen(false);
-            }
-          }}
-        >
-          <section
-            className={styles.feedbackDialog}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="feedback-title"
-          >
-            <div className={styles.dialogHeader}>
-              <div>
-                <p>Feedback</p>
-                <h2 id="feedback-title">Help improve Malcom</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFeedbackOpen(false)}
-                aria-label="Close feedback"
-              >
-                <X size={17} />
-              </button>
             </div>
-
-            <form className={styles.feedbackForm} onSubmit={submitFeedback}>
-              <label>
-                <span>Name</span>
-                <input
-                  required
-                  maxLength={80}
-                  value={feedbackName}
-                  onChange={(event) => setFeedbackName(event.target.value)}
-                  placeholder="Your name"
-                />
-              </label>
-              <label>
-                <span>Email</span>
-                <input
-                  required
-                  type="email"
-                  maxLength={180}
-                  value={feedbackEmail}
-                  onChange={(event) => setFeedbackEmail(event.target.value)}
-                  placeholder="you@example.com"
-                />
-              </label>
-
-              <fieldset className={styles.ratingField}>
-                <legend>Rating</legend>
-                <div>
-                  {[1, 2, 3, 4, 5].map((rating) => (
-                    <button
-                      key={rating}
-                      type="button"
-                      className={
-                        rating <= feedbackRating ? styles.ratingActive : ""
-                      }
-                      onClick={() => setFeedbackRating(rating)}
-                      aria-label={`Rate ${rating} out of 5`}
-                    >
-                      <Star size={18} />
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <label>
-                <span>Suggestion</span>
-                <textarea
-                  required
-                  maxLength={2000}
-                  value={feedbackSuggestion}
-                  onChange={(event) =>
-                    setFeedbackSuggestion(event.target.value)
-                  }
-                  placeholder="What should be better?"
-                  rows={5}
-                />
-              </label>
-
-              {feedbackStatus ? (
-                <p className={styles.feedbackStatus}>{feedbackStatus}</p>
-              ) : null}
-
-              <button type="submit" disabled={isSubmittingFeedback}>
-                <Sparkles size={16} />
-                {isSubmittingFeedback ? "Saving" : "Submit feedback"}
-              </button>
-            </form>
           </section>
         </div>
       ) : null}
 
-      {accessOpen ? (
-        <div
-          className={styles.dialogBackdrop}
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setAccessOpen(false);
-            }
-          }}
-        >
-          <section
-            className={styles.feedbackDialog}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="access-title"
-          >
-            <div className={styles.dialogHeader}>
-              <div>
-                <p>Login</p>
-                <h2 id="access-title">Request access</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAccessOpen(false)}
-                aria-label="Close access request"
-              >
-                <X size={17} />
-              </button>
-            </div>
-
-            <form className={styles.feedbackForm} onSubmit={submitAccessRequest}>
-              <label>
-                <span>Name</span>
-                <input
-                  required
-                  maxLength={80}
-                  value={accessName}
-                  onChange={(event) => setAccessName(event.target.value)}
-                  placeholder="Your name"
-                />
-              </label>
-              <label>
-                <span>Email</span>
-                <input
-                  required
-                  type="email"
-                  maxLength={180}
-                  value={accessEmail}
-                  onChange={(event) => setAccessEmail(event.target.value)}
-                  placeholder="you@example.com"
-                />
-              </label>
-
-              {accessStatus ? (
-                <p className={styles.feedbackStatus}>{accessStatus}</p>
-              ) : null}
-
-              <button type="submit" disabled={isSubmittingAccess}>
-                {isSubmittingAccess ? "Sending..." : "Request access"}
-              </button>
-            </form>
-          </section>
-        </div>
-      ) : null}
     </main>
   );
 }

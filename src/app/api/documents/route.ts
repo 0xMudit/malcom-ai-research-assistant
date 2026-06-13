@@ -3,6 +3,7 @@ import { getUserFromRequest } from "@/lib/auth";
 import {
   deleteUserDocument,
   getUserDocuments,
+  renameUserDocument,
   saveDocument,
 } from "@/lib/database";
 
@@ -196,4 +197,41 @@ export async function DELETE(request: Request) {
   await deleteUserDocument(user.id, id);
 
   return NextResponse.json({ ok: true });
+}
+
+export async function PATCH(request: Request) {
+  const user = await getUserFromRequest(request);
+
+  if (!user) {
+    return NextResponse.json(
+      { error: "Sign in to rename documents." },
+      { status: 401 },
+    );
+  }
+
+  const { id, name } = await request.json().catch(() => ({
+    id: "",
+    name: "",
+  }));
+
+  if (typeof id !== "string" || !id.trim()) {
+    return NextResponse.json({ error: "Missing document id." }, { status: 400 });
+  }
+
+  if (typeof name !== "string" || !name.trim()) {
+    return NextResponse.json(
+      { error: "Document name is required." },
+      { status: 400 },
+    );
+  }
+
+  const nextName = name.slice(0, 180).trim();
+
+  await renameUserDocument({
+    userId: user.id,
+    documentId: id,
+    name: nextName,
+  });
+
+  return NextResponse.json({ ok: true, document: { id, name: nextName } });
 }

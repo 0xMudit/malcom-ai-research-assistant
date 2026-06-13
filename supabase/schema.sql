@@ -79,6 +79,24 @@ create table if not exists public.documents (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.user_usage (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  period_started_at timestamptz not null default now(),
+  message_count integer not null default 0,
+  cooldown_until timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.user_subscriptions (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  stripe_customer_id text not null default '',
+  stripe_subscription_id text not null default '',
+  stripe_price_id text not null default '',
+  status text not null default 'none',
+  current_period_end timestamptz,
+  updated_at timestamptz not null default now()
+);
+
 alter table public.chat_sessions
   add column if not exists user_id uuid references auth.users(id) on delete cascade;
 
@@ -118,6 +136,12 @@ create index if not exists starred_responses_user_id_created_at_idx
 create index if not exists documents_user_id_created_at_idx
   on public.documents (user_id, created_at desc);
 
+create index if not exists user_subscriptions_customer_idx
+  on public.user_subscriptions (stripe_customer_id);
+
+create index if not exists user_subscriptions_subscription_idx
+  on public.user_subscriptions (stripe_subscription_id);
+
 alter table public.chat_sessions enable row level security;
 alter table public.chat_messages enable row level security;
 alter table public.feedback enable row level security;
@@ -127,3 +151,5 @@ alter table public.sexual_health_facts enable row level security;
 alter table public.starred_responses enable row level security;
 alter table public.user_profiles enable row level security;
 alter table public.documents enable row level security;
+alter table public.user_usage enable row level security;
+alter table public.user_subscriptions enable row level security;

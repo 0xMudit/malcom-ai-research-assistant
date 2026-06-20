@@ -19,7 +19,7 @@ export default function SettingsPage() {
             <h1>Workspace dashboard</h1>
             <p>Manage account, usage, billing, and privacy from one place.</p>
           </div>
-          <Link className={styles.secondaryButton} href="/">
+          <Link className={styles.secondaryButton} href="/new">
             Back to chat
           </Link>
         </header>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const authEmailRedirectTo =
@@ -8,11 +9,33 @@ const authEmailRedirectTo =
 
 export async function POST(request: Request) {
   try {
+    const limit = checkRateLimit(request, {
+      namespace: "auth-signup",
+      limit: 8,
+      windowMs: 60 * 60 * 1000,
+    });
+
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Too many sign-up attempts. Please try again later." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(limit.retryAfterSeconds) },
+        },
+      );
+    }
+
     const { email, password } = await request.json();
 
-    if (typeof email !== "string" || typeof password !== "string") {
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      email.length > 180 ||
+      password.length < 8 ||
+      password.length > 256
+    ) {
       return NextResponse.json(
-        { error: "Email and password are required." },
+        { error: "Enter a valid email and a password with at least 8 characters." },
         { status: 400 },
       );
     }

@@ -1,4 +1,5 @@
 import { saveResponseFeedback } from "@/lib/database";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,22 @@ function text(value: unknown, maxLength: number) {
 }
 
 export async function POST(request: Request) {
+  const limit = checkRateLimit(request, {
+    namespace: "response-feedback",
+    limit: 30,
+    windowMs: 60 * 60 * 1000,
+  });
+
+  if (!limit.allowed) {
+    return Response.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limit.retryAfterSeconds) },
+      },
+    );
+  }
+
   const body = await request.json().catch(() => null);
 
   if (!body || typeof body !== "object" || Array.isArray(body)) {

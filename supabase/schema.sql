@@ -68,6 +68,15 @@ create table if not exists public.user_profiles (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.gf_memo (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  memo_json text not null default '{}',
+  summary text not null default '',
+  prompt_count integer not null default 0,
+  last_prompt_excerpt text not null default '',
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.documents (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -133,6 +142,9 @@ create index if not exists access_requests_created_at_idx
 create index if not exists starred_responses_user_id_created_at_idx
   on public.starred_responses (user_id, created_at desc);
 
+create index if not exists gf_memo_updated_at_idx
+  on public.gf_memo (updated_at desc);
+
 create index if not exists documents_user_id_created_at_idx
   on public.documents (user_id, created_at desc);
 
@@ -150,6 +162,7 @@ alter table public.access_requests enable row level security;
 alter table public.sexual_health_facts enable row level security;
 alter table public.starred_responses enable row level security;
 alter table public.user_profiles enable row level security;
+alter table public.gf_memo enable row level security;
 alter table public.documents enable row level security;
 alter table public.user_usage enable row level security;
 alter table public.user_subscriptions enable row level security;

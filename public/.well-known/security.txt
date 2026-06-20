@@ -1,0 +1,4 @@
+Contact: https://malcomman.duckdns.org/contact
+Policy: https://malcomman.duckdns.org/privacy
+Preferred-Languages: en
+Expires: 2027-06-14T00:00:00Z

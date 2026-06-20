@@ -6,6 +6,7 @@ import {
   renameUserDocument,
   saveDocument,
 } from "@/lib/database";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -120,6 +121,31 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const contentLength = Number(request.headers.get("content-length") || 0);
+
+  if (Number.isFinite(contentLength) && contentLength > maxUploadBytes + 65_536) {
+    return NextResponse.json(
+      { error: "File is too large. Upload files up to 2 MB." },
+      { status: 413 },
+    );
+  }
+
+  const limit = checkRateLimit(request, {
+    namespace: "documents",
+    limit: 20,
+    windowMs: 60 * 60 * 1000,
+  });
+
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many uploads. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limit.retryAfterSeconds) },
+      },
+    );
+  }
+
   const user = await getUserFromRequest(request);
   const formData = await request.formData().catch(() => null);
   const file = formData?.get("file");

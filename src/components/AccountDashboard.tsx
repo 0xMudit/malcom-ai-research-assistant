@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { readApiJson } from "@/lib/api-client";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import styles from "@/app/app-pages.module.css";
 
@@ -116,31 +117,42 @@ export function AccountDashboard({
         ]);
 
       if (profileResponse.ok) {
-        const data = (await profileResponse.json()) as { profile?: UserProfile };
+        const data = await readApiJson<{ profile?: UserProfile }>(
+          profileResponse,
+          "Could not load profile.",
+        );
         setProfile(data.profile || { display_name: "", memory: "" });
       }
 
       if (usageResponse.ok) {
-        const data = (await usageResponse.json()) as { usage?: AccountUsage };
+        const data = await readApiJson<{ usage?: AccountUsage }>(
+          usageResponse,
+          "Could not load usage.",
+        );
         setUsage(data.usage || null);
       }
 
       if (chatsResponse.ok) {
-        const data = (await chatsResponse.json()) as { sessions?: SavedSession[] };
+        const data = await readApiJson<{ sessions?: SavedSession[] }>(
+          chatsResponse,
+          "Could not load chats.",
+        );
         setSessions(data.sessions || []);
       }
 
       if (starredResponse.ok) {
-        const data = (await starredResponse.json()) as {
-          starred?: StarredResponse[];
-        };
+        const data = await readApiJson<{ starred?: StarredResponse[] }>(
+          starredResponse,
+          "Could not load starred responses.",
+        );
         setStarred(data.starred || []);
       }
 
       if (docsResponse.ok) {
-        const data = (await docsResponse.json()) as {
-          documents?: DocumentResource[];
-        };
+        const data = await readApiJson<{ documents?: DocumentResource[] }>(
+          docsResponse,
+          "Could not load documents.",
+        );
         setDocuments(data.documents || []);
       }
     } catch {
@@ -156,16 +168,38 @@ export function AccountDashboard({
       return;
     }
 
-    void supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user || null);
-      setAccessToken(data.session?.access_token || "");
+    void supabase.auth.getSession().then(async ({ data }) => {
+      const session = data.session;
+      setAccessToken(session?.access_token || "");
+
+      if (!session) {
+        setUser(null);
+        return;
+      }
+
+      if (session.user) {
+        setUser(session.user);
+        return;
+      }
+
+      const { data: userData } = await supabase.auth.getUser();
+      setUser(userData.user || null);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
       setAccessToken(session?.access_token || "");
+
+      if (session?.user) {
+        setUser(session.user);
+      } else if (session) {
+        void supabase.auth.getUser().then(({ data }) => {
+          setUser(data.user || null);
+        });
+      } else {
+        setUser(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -224,7 +258,7 @@ export function AccountDashboard({
     await supabaseRef.current?.auth.signOut();
     setUser(null);
     setAccessToken("");
-    router.push("/");
+    router.push("/new");
     router.refresh();
   }
 
@@ -246,7 +280,10 @@ export function AccountDashboard({
         },
         body: JSON.stringify({ plan }),
       });
-      const data = (await response.json()) as { url?: string; error?: string };
+      const data = await readApiJson<{ url?: string }>(
+        response,
+        "Checkout could not be started.",
+      );
 
       if (!response.ok || !data.url) {
         throw new Error(data.error || "Checkout could not be started.");
@@ -258,6 +295,40 @@ export function AccountDashboard({
         caughtError instanceof Error
           ? caughtError.message
           : "Checkout could not be started.",
+      );
+      setIsWorking(false);
+    }
+  }
+
+  async function openBillingPortal() {
+    if (!accessToken) {
+      setStatus("Log in to manage billing.");
+      return;
+    }
+
+    setIsWorking(true);
+    setStatus("");
+
+    try {
+      const response = await fetch("/api/stripe/portal", {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      const data = await readApiJson<{ url?: string }>(
+        response,
+        "Billing portal could not be opened.",
+      );
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "Billing portal could not be opened.");
+      }
+
+      window.location.href = data.url;
+    } catch (caughtError) {
+      setStatus(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Billing portal could not be opened.",
       );
       setIsWorking(false);
     }
@@ -279,7 +350,7 @@ export function AccountDashboard({
           <Link className={styles.secondaryButton} href="/login">
             Log in
           </Link>
-          <Link className={styles.secondaryButton} href="/">
+          <Link className={styles.secondaryButton} href="/new">
             Try without an account
           </Link>
         </div>
@@ -305,11 +376,47 @@ export function AccountDashboard({
           </div>
           <p>
             {usage?.plan === "enterprise"
-              ? "Your account is on Enterprise. Highest limits are active while the Stripe subscription is active."
+              ? "Your account is on Enterprise. Free message limits and cooldowns are removed while the Stripe subscription is active."
               : usage?.plan === "pro"
-                ? "Your account is on Pro. Higher limits are active while the Stripe subscription is active."
+                ? "Your account is on Pro. Free message limits and cooldowns are removed while the Stripe subscription is active."
               : "Free accounts include 100 messages per window. After that, a 5-hour cooldown starts."}
           </p>
+          {usage?.plan === "pro" || usage?.plan === "enterprise" ? (
+            <>
+              <div className={styles.metricGrid}>
+                <div className={styles.metric}>
+                  <span>Status</span>
+                  <strong>{usage.subscriptionStatus}</strong>
+                </div>
+                <div className={styles.metric}>
+                  <span>Limit</span>
+                  <strong>None</strong>
+                </div>
+                <div className={styles.metric}>
+                  <span>Cooldown</span>
+                  <strong>Off</strong>
+                </div>
+              </div>
+              {usage.currentPeriodEnd ? (
+                <p className={styles.helperText}>
+                  Current period ends{" "}
+                  {new Date(usage.currentPeriodEnd).toLocaleDateString(
+                    "en-US",
+                    { dateStyle: "medium" },
+                  )}
+                  .
+                </p>
+              ) : null}
+              <button
+                className={styles.secondaryButton}
+                type="button"
+                onClick={() => void openBillingPortal()}
+                disabled={isWorking}
+              >
+                Manage billing
+              </button>
+            </>
+          ) : null}
           {usage?.plan === "free" || !usage ? (
             <div className={styles.metricGrid}>
               <div className={styles.metric}>
@@ -343,10 +450,11 @@ export function AccountDashboard({
 
         <section className={styles.card}>
           <span className={styles.badge}>Pro</span>
-          <h2>$999</h2>
+          <h2>$9.99/mo</h2>
           <p>
-            Higher limits for serious research sessions. Checkout uses Stripe
-            test or live mode based on your environment keys.
+            Removes free message limits and cooldowns for serious research
+            sessions. Checkout uses Stripe test or live mode from your
+            environment keys.
           </p>
           {status ? <p className={styles.statusText}>{status}</p> : null}
           <button
@@ -365,10 +473,10 @@ export function AccountDashboard({
 
         <section className={styles.card}>
           <span className={styles.badge}>Enterprise</span>
-          <h2>$10000</h2>
+          <h2>$29.99/mo</h2>
           <p>
-            Highest limits for larger teams and intensive workloads, billed
-            through the configured Enterprise Stripe price.
+            Highest configured plan for larger teams and intensive workloads,
+            billed through the configured Enterprise Stripe price.
           </p>
           <button
             className={styles.button}
@@ -480,8 +588,8 @@ export function AccountDashboard({
           </p>
           <ul>
             <li>Free - $0</li>
-            <li>Pro - $999</li>
-            <li>Enterprise - $10000</li>
+            <li>Pro - $9.99/mo</li>
+            <li>Enterprise - $29.99/mo</li>
           </ul>
           <div className={styles.buttonRow}>
             <button
@@ -510,6 +618,16 @@ export function AccountDashboard({
                 ? "Enterprise active"
                 : "Upgrade to Enterprise"}
             </button>
+            {usage?.plan === "pro" || usage?.plan === "enterprise" ? (
+              <button
+                className={styles.secondaryButton}
+                type="button"
+                onClick={() => void openBillingPortal()}
+                disabled={isWorking}
+              >
+                Manage billing
+              </button>
+            ) : null}
           </div>
         </section>
 

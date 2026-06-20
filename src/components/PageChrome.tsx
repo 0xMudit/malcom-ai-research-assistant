@@ -7,14 +7,15 @@ export function PageChrome({ children }: { children: ReactNode }) {
   return (
     <main className={styles.pageShell}>
       <header className={styles.topbar}>
-        <Link className={styles.brand} href="/">
+        <Link className={styles.brand} href="/new">
           <span className={styles.brandMark}>
             <BrainCircuit size={18} />
+            <small>Beta</small>
           </span>
           <span>Malcom</span>
         </Link>
         <nav aria-label="Primary navigation">
-          <Link href="/">Chat</Link>
+          <Link href="/new">Chat</Link>
           <Link href="/settings">Settings</Link>
         </nav>
       </header>

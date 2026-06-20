@@ -1,5 +1,5 @@
 import { getUserFromRequest } from "@/lib/auth";
-import { getUserProfile, saveUserProfile } from "@/lib/database";
+import { getUserGfMemo, getUserProfile, saveUserProfile } from "@/lib/database";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +11,12 @@ export async function GET(request: Request) {
     return Response.json({ error: "Sign in to load profile." }, { status: 401 });
   }
 
-  return Response.json({ profile: await getUserProfile(user.id) });
+  const [profile, gfMemo] = await Promise.all([
+    getUserProfile(user.id),
+    getUserGfMemo(user.id),
+  ]);
+
+  return Response.json({ profile, gfMemo });
 }
 
 export async function PATCH(request: Request) {
@@ -32,8 +37,13 @@ export async function PATCH(request: Request) {
   await saveUserProfile({
     userId: user.id,
     displayName:
-      typeof record.displayName === "string" ? record.displayName : "",
-    memory: typeof record.memory === "string" ? record.memory : "",
+      typeof record.displayName === "string"
+        ? record.displayName.replace(/\u0000/g, "").trim().slice(0, 120)
+        : "",
+    memory:
+      typeof record.memory === "string"
+        ? record.memory.replace(/\u0000/g, "").trim().slice(0, 4_000)
+        : "",
   });
 
   return Response.json({ ok: true });

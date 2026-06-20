@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
+import type { User } from "@supabase/supabase-js";
 import {
   buildSexualHealthFacts,
   targetSexualHealthFactCount,
@@ -8,15 +9,28 @@ import {
 import { planFromStripePriceId } from "@/lib/stripe";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
 import {
+  createSupabaseBackupAdminClients,
   createSupabaseAdminClient,
   hasSupabaseAdminConfig,
 } from "@/lib/supabase/server";
+import {
+  deleteCache,
+  getCacheJson,
+  setCacheJson,
+} from "@/lib/redis-cache";
+import {
+  analyzePromptPatterns,
+  formatGfMemoMemory,
+  type PromptPatternInput,
+  type PromptPatternProfile,
+} from "@/lib/user-patterns";
 
+let supabaseFactsSeeded = false;
+const reportedBackupErrors = new Set<string>();
+const reportedSupabaseErrors = new Set<string>();
 const dataDir = path.join(process.cwd(), "data");
 const dbPath = path.join(dataDir, "malcom.sqlite");
-
 let db: Database.Database | null = null;
-let supabaseFactsSeeded = false;
 
 export type StoredMessage = {
   id: string;
@@ -73,6 +87,96 @@ export type AppStats = {
   responseActions: number;
 };
 
+export type AdminUserPlan = PlanName | "unknown";
+
+export type AdminUserSummary = {
+  id: string;
+  email: string;
+  displayName: string;
+  plan: AdminUserPlan;
+  subscriptionStatus: string;
+  sessions: number;
+  messages: number;
+  userMessages: number;
+  assistantMessages: number;
+  documents: number;
+  documentBytes: number;
+  starredResponses: number;
+  usageMessages: number;
+  createdAt: string;
+  lastActive: string;
+  lastSignInAt: string;
+};
+
+export type AdminDailyMetric = {
+  date: string;
+  signups: number;
+  sessions: number;
+  messages: number;
+  feedback: number;
+  accessRequests: number;
+};
+
+export type AdminDashboardData = {
+  generatedAt: string;
+  storageMode: "supabase" | "sqlite";
+  registrationSource: "supabase-auth" | "activity";
+  stats: {
+    registeredUsers: number;
+    knownUsers: number;
+    currentUsers: number;
+    activeUsers24h: number;
+    activeUsers7d: number;
+    newUsers24h: number;
+    newUsers7d: number;
+    sessions: number;
+    sessions24h: number;
+    sessions7d: number;
+    guestSessions: number;
+    messages: number;
+    userMessages: number;
+    assistantMessages: number;
+    messages24h: number;
+    messages7d: number;
+    feedback: number;
+    averageRating: number;
+    accessRequests: number;
+    pendingAccessRequests: number;
+    approvedAccessRequests: number;
+    rejectedAccessRequests: number;
+    responseActions: number;
+    likedResponses: number;
+    dislikedResponses: number;
+    commentedResponses: number;
+    documents: number;
+    documentBytes: number;
+    starredResponses: number;
+    profiles: number;
+    trackedUsage: number;
+    limitedFreeUsers: number;
+    subscriptions: number;
+    activeSubscriptions: number;
+    proUsers: number;
+    enterpriseUsers: number;
+    freeUsers: number;
+  };
+  plans: {
+    free: number;
+    pro: number;
+    enterprise: number;
+    unknown: number;
+    activePaid: number;
+    trialing: number;
+    canceled: number;
+    pastDue: number;
+    unpaid: number;
+    none: number;
+    other: number;
+  };
+  daily: AdminDailyMetric[];
+  users: AdminUserSummary[];
+};
+
 export type SexualHealthFact = {
   id: number;
   fact: string;
@@ -116,6 +220,16 @@ export type StoredUserUsage = {
   updated_at: string;
 };
 
+export type UserPromptPattern = PromptPatternProfile & {
+  user_id: string;
+};
+
+export type UserGfMemo = PromptPatternProfile & {
+  user_id: string;
+  summary: string;
+  updated_at: string;
+};
+
 export type StoredUserSubscription = {
   user_id: string;
   stripe_customer_id: string;
@@ -140,6 +254,22 @@ export type UserUsageStatus = {
 
 export const freeMessageLimit = 100;
 export const freeCooldownMs = 5 * 60 * 60 * 1000;
+
+function userProfileCacheKey(userId: string) {
+  return `user:${userId}:profile`;
+}
+
+function userGfMemoCacheKey(userId: string) {
+  return `user:${userId}:gf_memo`;
+}
+
+function userUsageCacheKey(userId: string) {
+  return `user:${userId}:usage`;
+}
+
+function userSubscriptionCacheKey(userId: string) {
+  return `user:${userId}:subscription`;
+}
 
 function getDb() {
   if (db) {
@@ -227,6 +357,15 @@ function getDb() {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS gf_memo (
+      user_id TEXT PRIMARY KEY,
+      memo_json TEXT NOT NULL DEFAULT '{}',
+      summary TEXT NOT NULL DEFAULT '',
+      prompt_count INTEGER NOT NULL DEFAULT 0,
+      last_prompt_excerpt TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -275,9 +414,15 @@ function getDb() {
   }
 
   for (const [name, sql] of [
-    ["folder", "ALTER TABLE chat_sessions ADD COLUMN folder TEXT NOT NULL DEFAULT ''"],
+    [
+      "folder",
+      "ALTER TABLE chat_sessions ADD COLUMN folder TEXT NOT NULL DEFAULT ''",
+    ],
     ["tags", "ALTER TABLE chat_sessions ADD COLUMN tags TEXT NOT NULL DEFAULT ''"],
-    ["pinned", "ALTER TABLE chat_sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0"],
+    [
+      "pinned",
+      "ALTER TABLE chat_sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
+    ],
   ] as const) {
     if (!sessionColumns.some((column) => column.name === name)) {
       db.exec(sql);
@@ -315,9 +460,102 @@ function shouldUseSupabase() {
   return Boolean(getSupabasePublicConfig() && hasSupabaseAdminConfig());
 }
 
+export function getLocalDatabaseHealth() {
+  const database = getDb();
+  const tables = [
+    "chat_sessions",
+    "chat_messages",
+    "feedback",
+    "response_feedback",
+    "access_requests",
+    "sexual_health_facts",
+    "starred_responses",
+    "user_profiles",
+    "gf_memo",
+    "documents",
+    "user_usage",
+    "user_subscriptions",
+  ];
+  const counts = Object.fromEntries(
+    tables.map((table) => {
+      const row = database
+        .prepare(`SELECT COUNT(*) AS count FROM ${table}`)
+        .get() as { count: number } | undefined;
+
+      return [table, Number(row?.count || 0)];
+    }),
+  );
+
+  return {
+    ok: true,
+    path: dbPath,
+    counts,
+  };
+}
+
+type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
+
+async function writeToSupabaseBackups(
+  action: string,
+  operation: (client: SupabaseAdminClient) => Promise<void>,
+) {
+  const backups = createSupabaseBackupAdminClients();
+
+  await Promise.all(
+    backups.map(async (client, index) => {
+      try {
+        await operation(client);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const key = `${action}:${index}:${message}`;
+
+        if (!reportedBackupErrors.has(key)) {
+          reportedBackupErrors.add(key);
+          console.error(`Supabase backup ${action} failed: ${message}`);
+        }
+      }
+    }),
+  );
+}
+
+async function writeToSupabase(
+  action: string,
+  operation: (client: SupabaseAdminClient) => Promise<void>,
+) {
+  const primary = createSupabaseAdminClient();
+
+  try {
+    await operation(primary);
+  } catch (error) {
+    reportSupabaseError(action, error);
+    throw error;
+  }
+
+  await writeToSupabaseBackups(action, operation);
+}
+
 function reportSupabaseError(action: string, error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  console.error(`Supabase ${action} failed; falling back to SQLite. ${message}`);
+  const key = `${action}:${message}`;
+
+  if (reportedSupabaseErrors.has(key)) {
+    return;
+  }
+
+  reportedSupabaseErrors.add(key);
+  console.error(`Supabase ${action} failed; using local fallback. ${message}`);
+}
+
+function isMissingGfMemoSchema(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  return /gf_memo|Could not find the table|schema cache|relation .* does not exist/i.test(
+    message,
+  );
+}
+
+export function getSupabaseFallbackReason() {
+  return null;
 }
 
 function throwOnSupabaseError(error: unknown) {
@@ -335,7 +573,7 @@ function throwOnSupabaseError(error: unknown) {
 }
 
 async function ensureSupabaseFactsSeeded() {
-  if (supabaseFactsSeeded || !shouldUseSupabase()) {
+  if (supabaseFactsSeeded) {
     return;
   }
 
@@ -371,67 +609,198 @@ export async function saveChatMessage(input: {
   content: string;
   title?: string;
 }) {
-  if (shouldUseSupabase()) {
-    try {
-      const supabase = createSupabaseAdminClient();
-      const title =
-        (input.title || input.content).slice(0, 80).trim() || "Untitled";
-      const updatedAt = new Date().toISOString();
+  const title = (input.title || input.content).slice(0, 80).trim() || "Untitled";
+  const updatedAt = new Date().toISOString();
 
-      const { error: sessionError } = await supabase
-        .from("chat_sessions")
-        .upsert(
-          {
-            id: input.sessionId,
-            user_id: input.userId || null,
-            title,
-            updated_at: updatedAt,
-          },
-          { onConflict: "id" },
-        );
+  await writeToSupabase("saveChatMessage", async (supabase) => {
+    const { error: sessionError } = await supabase
+      .from("chat_sessions")
+      .upsert(
+        {
+          id: input.sessionId,
+          user_id: input.userId || null,
+          title,
+          updated_at: updatedAt,
+        },
+        { onConflict: "id" },
+      );
 
-      throwOnSupabaseError(sessionError);
+    throwOnSupabaseError(sessionError);
 
-      const { error: messageError } = await supabase
-        .from("chat_messages")
-        .upsert(
-          {
-            id: input.id,
-            session_id: input.sessionId,
-            role: input.role,
-            content: input.content,
-          },
-          { onConflict: "id", ignoreDuplicates: true },
-        );
+    const { error: messageError } = await supabase
+      .from("chat_messages")
+      .upsert(
+        {
+          id: input.id,
+          session_id: input.sessionId,
+          role: input.role,
+          content: input.content,
+        },
+        { onConflict: "id", ignoreDuplicates: true },
+      );
 
-      throwOnSupabaseError(messageError);
-      return;
-    } catch (error) {
-      reportSupabaseError("saveChatMessage", error);
-    }
+    throwOnSupabaseError(messageError);
+  });
+}
+
+export async function saveFeedback(input: {
+  id: string;
+  name: string;
+  email: string;
+  rating: number;
+  suggestion: string;
+  userAgent: string;
+}) {
+  await writeToSupabase("saveFeedback", async (supabase) => {
+    const { error } = await supabase.from("feedback").insert({
+      id: input.id,
+      name: input.name,
+      email: input.email,
+      rating: input.rating,
+      suggestion: input.suggestion,
+      user_agent: input.userAgent,
+    });
+
+    throwOnSupabaseError(error);
+  });
+}
+
+export async function saveAccessRequest(input: {
+  id: string;
+  name: string;
+  email: string;
+  userAgent: string;
+}) {
+  await writeToSupabase("saveAccessRequest", async (supabase) => {
+    const { error } = await supabase
+      .from("access_requests")
+      .upsert(
+        {
+          id: input.id,
+          name: input.name,
+          email: input.email.toLowerCase(),
+          user_agent: input.userAgent,
+          status: "pending",
+          created_at: new Date().toISOString(),
+        },
+        { onConflict: "email" },
+      );
+
+    throwOnSupabaseError(error);
+  });
+}
+
+export async function updateAccessRequestStatus(input: {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+}) {
+  await writeToSupabase("updateAccessRequestStatus", async (supabase) => {
+    const { error } = await supabase
+      .from("access_requests")
+      .update({ status: input.status })
+      .eq("id", input.id);
+
+    throwOnSupabaseError(error);
+  });
+}
+
+export async function saveResponseFeedback(input: {
+  id: string;
+  messageId: string;
+  reaction: "like" | "dislike" | "comment";
+  comment?: string;
+}) {
+  await writeToSupabase("saveResponseFeedback", async (supabase) => {
+    const { error } = await supabase.from("response_feedback").insert({
+      id: input.id,
+      message_id: input.messageId,
+      reaction: input.reaction,
+      comment: input.comment || "",
+    });
+
+    throwOnSupabaseError(error);
+  });
+}
+
+async function getSupabaseCount(table: string) {
+  const supabase = createSupabaseAdminClient();
+  const { count, error } = await supabase
+    .from(table)
+    .select("id", { count: "exact", head: true });
+
+  throwOnSupabaseError(error);
+  return Number(count || 0);
+}
+
+export async function getStats(): Promise<AppStats> {
+  try {
+    const supabase = createSupabaseAdminClient();
+    const [
+      sessions,
+      messages,
+      feedback,
+      accessRequests,
+      responseActions,
+      ratings,
+    ] = await Promise.all([
+      getSupabaseCount("chat_sessions"),
+      getSupabaseCount("chat_messages"),
+      getSupabaseCount("feedback"),
+      getSupabaseCount("access_requests"),
+      getSupabaseCount("response_feedback"),
+      supabase.from("feedback").select("rating"),
+    ]);
+
+    throwOnSupabaseError(ratings.error);
+
+    const ratingRows = ratings.data || [];
+    const averageRating = ratingRows.length
+      ? ratingRows.reduce((total, row) => total + Number(row.rating || 0), 0) /
+        ratingRows.length
+      : 0;
+
+    return {
+      sessions,
+      messages,
+      feedback,
+      averageRating,
+      accessRequests,
+      responseActions,
+    };
+  } catch (error) {
+    reportSupabaseError("getStats", error);
   }
 
   const database = getDb();
-  const title = (input.title || input.content).slice(0, 80).trim() || "Untitled";
-
-  database
+  const row = database
     .prepare(
-      `INSERT INTO chat_sessions (id, user_id, title)
-       VALUES (?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-         user_id = COALESCE(excluded.user_id, chat_sessions.user_id),
-         updated_at = datetime('now')`,
+      `SELECT
+        (SELECT COUNT(*) FROM chat_sessions) AS sessions,
+        (SELECT COUNT(*) FROM chat_messages) AS messages,
+        (SELECT COUNT(*) FROM feedback) AS feedback,
+        COALESCE((SELECT AVG(rating) FROM feedback), 0) AS averageRating,
+        (SELECT COUNT(*) FROM access_requests) AS accessRequests,
+        (SELECT COUNT(*) FROM response_feedback) AS responseActions`,
     )
-    .run(input.sessionId, input.userId || null, title);
+    .get() as AppStats | undefined;
 
-  database
-    .prepare(
-      `INSERT OR IGNORE INTO chat_messages (id, session_id, role, content)
-       VALUES (?, ?, ?, ?)`,
-    )
-    .run(input.id, input.sessionId, input.role, input.content);
+  return {
+    sessions: Number(row?.sessions || 0),
+    messages: Number(row?.messages || 0),
+    feedback: Number(row?.feedback || 0),
+    averageRating: Number(row?.averageRating || 0),
+    accessRequests: Number(row?.accessRequests || 0),
+    responseActions: Number(row?.responseActions || 0),
+  };
 }
 
+/*
+ * The following SQLite fallback implementation was removed when Supabase
+ * PostgreSQL became the required runtime database. The app now fails loudly on
+ * Supabase schema/configuration errors so production data cannot split across
+ * two stores.
+ */
+/*
 export async function saveFeedback(input: {
   id: string;
   name: string;
@@ -646,6 +1015,971 @@ export async function getStats(): Promise<AppStats> {
     accessRequests: Number(row?.accessRequests || 0),
     responseActions: Number(row?.responseActions || 0),
   };
+}
+*/
+
+const adminActivityRowLimit = 5000;
+const adminAuthUserLimit = 10000;
+const dayMs = 24 * 60 * 60 * 1000;
+
+type AdminAuthUser = {
+  id: string;
+  email: string;
+  displayName: string;
+  createdAt: string;
+  lastSignInAt: string;
+};
+
+type AdminSessionActivity = {
+  id: string;
+  user_id: string | null;
+  title?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type AdminMessageActivity = {
+  id: string;
+  user_id: string;
+  role: "user" | "assistant";
+  created_at: string;
+};
+
+type AdminDocumentActivity = {
+  id: string;
+  user_id: string;
+  size: number;
+  created_at: string;
+};
+
+type AdminStarredActivity = {
+  id: string;
+  user_id: string;
+  created_at: string;
+};
+
+type AdminProfileActivity = {
+  user_id: string;
+  display_name: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type AdminUsageActivity = StoredUserUsage;
+
+type AdminActivityInput = {
+  storageMode: "supabase" | "sqlite";
+  registrationSource: "supabase-auth" | "activity";
+  baseStats: AppStats;
+  authUsers: AdminAuthUser[];
+  sessions: AdminSessionActivity[];
+  messages: AdminMessageActivity[];
+  documents: AdminDocumentActivity[];
+  starred: AdminStarredActivity[];
+  profiles: AdminProfileActivity[];
+  usage: AdminUsageActivity[];
+  subscriptions: StoredUserSubscription[];
+  feedbackActivity: Array<{ created_at: string }>;
+  accessActivity: Array<{ created_at: string; status?: string | null }>;
+  responseActivity: Array<{ reaction: string }>;
+  exactCounts: {
+    sessions24h: number;
+    sessions7d: number;
+    guestSessions: number;
+    userMessages: number;
+    assistantMessages: number;
+    messages24h: number;
+    messages7d: number;
+    documents: number;
+    starredResponses: number;
+    profiles: number;
+    trackedUsage: number;
+    subscriptions: number;
+  };
+  recentUserLimit: number;
+};
+
+type AdminUserAccumulator = {
+  id: string;
+  email: string;
+  displayName: string;
+  plan: AdminUserPlan;
+  subscriptionStatus: string;
+  sessions: number;
+  messages: number;
+  userMessages: number;
+  assistantMessages: number;
+  documents: number;
+  documentBytes: number;
+  starredResponses: number;
+  usageMessages: number;
+  createdAt: string;
+  lastActive: string;
+  lastSignInAt: string;
+};
+
+type SupabaseCountFilter =
+  | { method: "eq" | "gte"; column: string; value: string }
+  | { method: "is"; column: string; value: null };
+
+function timestampOf(value: string | null | undefined) {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function isWithin(value: string | null | undefined, since: number) {
+  const timestamp = timestampOf(value);
+  return timestamp > 0 && timestamp >= since;
+}
+
+function dateKey(value: string | null | undefined) {
+  const timestamp = timestampOf(value);
+
+  if (!timestamp) {
+    return "";
+  }
+
+  return new Date(timestamp).toISOString().slice(0, 10);
+}
+
+function createDailyMetrics(days = 14) {
+  const map = new Map<string, AdminDailyMetric>();
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+
+  for (let index = 0; index < days; index += 1) {
+    const date = new Date(start);
+    date.setUTCDate(start.getUTCDate() + index);
+    const key = date.toISOString().slice(0, 10);
+    map.set(key, {
+      date: key,
+      signups: 0,
+      sessions: 0,
+      messages: 0,
+      feedback: 0,
+      accessRequests: 0,
+    });
+  }
+
+  return map;
+}
+
+function incrementDaily(
+  daily: Map<string, AdminDailyMetric>,
+  value: string | null | undefined,
+  key: keyof Omit<AdminDailyMetric, "date">,
+) {
+  const metric = daily.get(dateKey(value));
+
+  if (metric) {
+    metric[key] += 1;
+  }
+}
+
+function readMetadataString(metadata: unknown, keys: string[]) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return "";
+  }
+
+  const record = metadata as Record<string, unknown>;
+
+  for (const key of keys) {
+    const value = record[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
+
+function makeAdminAuthUser(user: User): AdminAuthUser {
+  return {
+    id: user.id,
+    email: user.email || "",
+    displayName: readMetadataString(user.user_metadata, [
+      "display_name",
+      "name",
+      "full_name",
+    ]),
+    createdAt: user.created_at || "",
+    lastSignInAt: user.last_sign_in_at || "",
+  };
+}
+
+async function listSupabaseAuthUsers(limit = adminAuthUserLimit) {
+  const supabase = createSupabaseAdminClient();
+  const users: AdminAuthUser[] = [];
+  const perPage = 1000;
+
+  for (let page = 1; users.length < limit; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage: Math.min(perPage, limit - users.length),
+    });
+
+    throwOnSupabaseError(error);
+
+    const pageUsers = data.users || [];
+    users.push(...pageUsers.map(makeAdminAuthUser));
+
+    if (pageUsers.length < perPage) {
+      break;
+    }
+  }
+
+  return users;
+}
+
+async function countSupabaseRows(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  table: string,
+  filters: SupabaseCountFilter[] = [],
+) {
+  let query = supabase.from(table).select("id", { count: "exact", head: true });
+
+  for (const filter of filters) {
+    if (filter.method === "eq") {
+      query = query.eq(filter.column, filter.value);
+    } else if (filter.method === "gte") {
+      query = query.gte(filter.column, filter.value);
+    } else {
+      query = query.is(filter.column, filter.value);
+    }
+  }
+
+  const { count, error } = await query;
+  throwOnSupabaseError(error);
+  return Number(count || 0);
+}
+
+function getAdminUser(
+  users: Map<string, AdminUserAccumulator>,
+  userId: string,
+) {
+  const id = userId.trim();
+
+  if (!id) {
+    return null;
+  }
+
+  const existing = users.get(id);
+
+  if (existing) {
+    return existing;
+  }
+
+  const user: AdminUserAccumulator = {
+    id,
+    email: "",
+    displayName: "",
+    plan: "free",
+    subscriptionStatus: "none",
+    sessions: 0,
+    messages: 0,
+    userMessages: 0,
+    assistantMessages: 0,
+    documents: 0,
+    documentBytes: 0,
+    starredResponses: 0,
+    usageMessages: 0,
+    createdAt: "",
+    lastActive: "",
+    lastSignInAt: "",
+  };
+
+  users.set(id, user);
+  return user;
+}
+
+function setEarliestCreatedAt(user: AdminUserAccumulator, value: string) {
+  if (!value) {
+    return;
+  }
+
+  if (!user.createdAt || timestampOf(value) < timestampOf(user.createdAt)) {
+    user.createdAt = value;
+  }
+}
+
+function setLatestActivity(user: AdminUserAccumulator, value: string) {
+  if (!value) {
+    return;
+  }
+
+  if (!user.lastActive || timestampOf(value) > timestampOf(user.lastActive)) {
+    user.lastActive = value;
+  }
+}
+
+function applySubscriptionToUser(
+  user: AdminUserAccumulator,
+  subscription: StoredUserSubscription,
+) {
+  const active = isActiveSubscriptionStatus(subscription.status);
+
+  user.subscriptionStatus = subscription.status || "none";
+  user.plan = active ? planFromStripePriceId(subscription.stripe_price_id) : "free";
+  setLatestActivity(user, subscription.updated_at);
+}
+
+function buildAdminDashboardSnapshot(input: AdminActivityInput): AdminDashboardData {
+  const now = Date.now();
+  const since24h = now - dayMs;
+  const since7d = now - 7 * dayMs;
+  const daily = createDailyMetrics();
+  const users = new Map<string, AdminUserAccumulator>();
+
+  for (const authUser of input.authUsers) {
+    const user = getAdminUser(users, authUser.id);
+
+    if (!user) {
+      continue;
+    }
+
+    user.email = authUser.email;
+    user.displayName = authUser.displayName;
+    user.lastSignInAt = authUser.lastSignInAt;
+    setEarliestCreatedAt(user, authUser.createdAt);
+    setLatestActivity(user, authUser.lastSignInAt || authUser.createdAt);
+    incrementDaily(daily, authUser.createdAt, "signups");
+  }
+
+  for (const session of input.sessions) {
+    incrementDaily(daily, session.created_at, "sessions");
+
+    const user = getAdminUser(users, session.user_id || "");
+
+    if (!user) {
+      continue;
+    }
+
+    user.sessions += 1;
+    setEarliestCreatedAt(user, session.created_at);
+    setLatestActivity(user, session.updated_at || session.created_at);
+  }
+
+  for (const message of input.messages) {
+    incrementDaily(daily, message.created_at, "messages");
+
+    const user = getAdminUser(users, message.user_id);
+
+    if (!user) {
+      continue;
+    }
+
+    user.messages += 1;
+
+    if (message.role === "user") {
+      user.userMessages += 1;
+    } else {
+      user.assistantMessages += 1;
+    }
+
+    setLatestActivity(user, message.created_at);
+  }
+
+  for (const document of input.documents) {
+    const user = getAdminUser(users, document.user_id);
+
+    if (!user) {
+      continue;
+    }
+
+    user.documents += 1;
+    user.documentBytes += Math.max(0, Number(document.size || 0));
+    setEarliestCreatedAt(user, document.created_at);
+    setLatestActivity(user, document.created_at);
+  }
+
+  for (const response of input.starred) {
+    const user = getAdminUser(users, response.user_id);
+
+    if (!user) {
+      continue;
+    }
+
+    user.starredResponses += 1;
+    setLatestActivity(user, response.created_at);
+  }
+
+  for (const profile of input.profiles) {
+    const user = getAdminUser(users, profile.user_id);
+
+    if (!user) {
+      continue;
+    }
+
+    if (!user.displayName && profile.display_name) {
+      user.displayName = profile.display_name;
+    }
+
+    setEarliestCreatedAt(user, profile.created_at);
+    setLatestActivity(user, profile.updated_at || profile.created_at);
+  }
+
+  for (const usage of input.usage) {
+    const user = getAdminUser(users, usage.user_id);
+
+    if (!user) {
+      continue;
+    }
+
+    user.usageMessages = Math.max(0, Number(usage.message_count || 0));
+    setLatestActivity(user, usage.updated_at);
+  }
+
+  const plans = {
+    free: 0,
+    pro: 0,
+    enterprise: 0,
+    unknown: 0,
+    activePaid: 0,
+    trialing: 0,
+    canceled: 0,
+    pastDue: 0,
+    unpaid: 0,
+    none: 0,
+    other: 0,
+  };
+
+  for (const subscription of input.subscriptions) {
+    const normalized = normalizeSubscriptionRow(
+      subscription.user_id,
+      subscription,
+    );
+    const status = normalized.status;
+
+    if (status === "trialing") {
+      plans.trialing += 1;
+    } else if (status === "canceled") {
+      plans.canceled += 1;
+    } else if (status === "past_due") {
+      plans.pastDue += 1;
+    } else if (status === "unpaid") {
+      plans.unpaid += 1;
+    } else if (status === "none") {
+      plans.none += 1;
+    } else if (status && status !== "active") {
+      plans.other += 1;
+    }
+
+    const user = getAdminUser(users, normalized.user_id);
+
+    if (user) {
+      applySubscriptionToUser(user, normalized);
+    }
+
+    if (!isActiveSubscriptionStatus(status)) {
+      continue;
+    }
+
+    const plan = planFromStripePriceId(normalized.stripe_price_id);
+    plans.activePaid += 1;
+
+    if (plan === "enterprise") {
+      plans.enterprise += 1;
+    } else if (plan === "pro") {
+      plans.pro += 1;
+    } else {
+      plans.free += 1;
+    }
+  }
+
+  for (const feedback of input.feedbackActivity) {
+    incrementDaily(daily, feedback.created_at, "feedback");
+  }
+
+  const accessCounts = {
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  };
+
+  for (const access of input.accessActivity) {
+    incrementDaily(daily, access.created_at, "accessRequests");
+
+    if (access.status === "approved") {
+      accessCounts.approved += 1;
+    } else if (access.status === "rejected") {
+      accessCounts.rejected += 1;
+    } else {
+      accessCounts.pending += 1;
+    }
+  }
+
+  const responseCounts = {
+    like: 0,
+    dislike: 0,
+    comment: 0,
+  };
+
+  for (const response of input.responseActivity) {
+    if (response.reaction === "like") {
+      responseCounts.like += 1;
+    } else if (response.reaction === "dislike") {
+      responseCounts.dislike += 1;
+    } else if (response.reaction === "comment") {
+      responseCounts.comment += 1;
+    }
+  }
+
+  const userRows = [...users.values()];
+
+  if (input.registrationSource === "activity") {
+    for (const user of userRows) {
+      incrementDaily(daily, user.createdAt, "signups");
+    }
+  }
+
+  const registeredUsers =
+    input.registrationSource === "supabase-auth"
+      ? input.authUsers.length
+      : userRows.length;
+  const knownUsers = userRows.length;
+  const activeUsers24h = userRows.filter((user) =>
+    isWithin(user.lastActive || user.lastSignInAt, since24h),
+  ).length;
+  const activeUsers7d = userRows.filter((user) =>
+    isWithin(user.lastActive || user.lastSignInAt, since7d),
+  ).length;
+  const newUsers24h = userRows.filter((user) =>
+    isWithin(user.createdAt, since24h),
+  ).length;
+  const newUsers7d = userRows.filter((user) =>
+    isWithin(user.createdAt, since7d),
+  ).length;
+  const limitedFreeUsers = input.usage.filter((usage) => {
+    const user = users.get(usage.user_id);
+
+    if (user?.plan === "pro" || user?.plan === "enterprise") {
+      return false;
+    }
+
+    const count = Math.max(0, Number(usage.message_count || 0));
+    return count >= freeMessageLimit || isWithin(usage.cooldown_until, now);
+  }).length;
+  const documentBytes = input.documents.reduce(
+    (total, document) => total + Math.max(0, Number(document.size || 0)),
+    0,
+  );
+  const activeSubscriptions = plans.activePaid;
+  const freeUsers = Math.max(0, registeredUsers - activeSubscriptions);
+
+  plans.free = freeUsers;
+  plans.unknown = Math.max(0, knownUsers - registeredUsers);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    storageMode: input.storageMode,
+    registrationSource: input.registrationSource,
+    stats: {
+      registeredUsers,
+      knownUsers,
+      currentUsers: activeUsers24h,
+      activeUsers24h,
+      activeUsers7d,
+      newUsers24h,
+      newUsers7d,
+      sessions: input.baseStats.sessions,
+      sessions24h: input.exactCounts.sessions24h,
+      sessions7d: input.exactCounts.sessions7d,
+      guestSessions: input.exactCounts.guestSessions,
+      messages: input.baseStats.messages,
+      userMessages: input.exactCounts.userMessages,
+      assistantMessages: input.exactCounts.assistantMessages,
+      messages24h: input.exactCounts.messages24h,
+      messages7d: input.exactCounts.messages7d,
+      feedback: input.baseStats.feedback,
+      averageRating: input.baseStats.averageRating,
+      accessRequests: input.baseStats.accessRequests,
+      pendingAccessRequests: accessCounts.pending,
+      approvedAccessRequests: accessCounts.approved,
+      rejectedAccessRequests: accessCounts.rejected,
+      responseActions: input.baseStats.responseActions,
+      likedResponses: responseCounts.like,
+      dislikedResponses: responseCounts.dislike,
+      commentedResponses: responseCounts.comment,
+      documents: input.exactCounts.documents,
+      documentBytes,
+      starredResponses: input.exactCounts.starredResponses,
+      profiles: input.exactCounts.profiles,
+      trackedUsage: input.exactCounts.trackedUsage,
+      limitedFreeUsers,
+      subscriptions: input.exactCounts.subscriptions,
+      activeSubscriptions,
+      proUsers: plans.pro,
+      enterpriseUsers: plans.enterprise,
+      freeUsers,
+    },
+    plans,
+    daily: [...daily.values()],
+    users: userRows
+      .sort(
+        (a, b) =>
+          timestampOf(b.lastActive || b.lastSignInAt || b.createdAt) -
+          timestampOf(a.lastActive || a.lastSignInAt || a.createdAt),
+      )
+      .slice(0, input.recentUserLimit),
+  };
+}
+
+async function getSupabaseAdminDashboardData(
+  recentUserLimit: number,
+): Promise<AdminDashboardData> {
+  const supabase = createSupabaseAdminClient();
+  const since24h = new Date(Date.now() - dayMs).toISOString();
+  const since7d = new Date(Date.now() - 7 * dayMs).toISOString();
+  const recentWindow = new Date(Date.now() - 13 * dayMs).toISOString();
+  let authUsers: AdminAuthUser[] = [];
+
+  try {
+    authUsers = await listSupabaseAuthUsers();
+  } catch (error) {
+    reportSupabaseError("listSupabaseAuthUsers", error);
+  }
+
+  const [
+    baseStats,
+    sessionsResult,
+    messagesResult,
+    documentsResult,
+    starredResult,
+    profilesResult,
+    usageResult,
+    subscriptionsResult,
+    feedbackActivityResult,
+    accessActivityResult,
+    responseActivityResult,
+    sessions24h,
+    sessions7d,
+    guestSessions,
+    userMessages,
+    assistantMessages,
+    messages24h,
+    messages7d,
+    documents,
+    starredResponses,
+    profiles,
+    trackedUsage,
+    subscriptions,
+  ] = await Promise.all([
+    getStats(),
+    supabase
+      .from("chat_sessions")
+      .select("id, user_id, title, created_at, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(adminActivityRowLimit),
+    supabase
+      .from("chat_messages")
+      .select("id, role, created_at, chat_sessions!inner(user_id)")
+      .order("created_at", { ascending: false })
+      .limit(adminActivityRowLimit),
+    supabase
+      .from("documents")
+      .select("id, user_id, size, created_at")
+      .order("created_at", { ascending: false })
+      .limit(adminActivityRowLimit),
+    supabase
+      .from("starred_responses")
+      .select("id, user_id, created_at")
+      .order("created_at", { ascending: false })
+      .limit(adminActivityRowLimit),
+    supabase
+      .from("user_profiles")
+      .select("user_id, display_name, created_at, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(adminActivityRowLimit),
+    supabase
+      .from("user_usage")
+      .select("user_id, period_started_at, message_count, cooldown_until, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(adminActivityRowLimit),
+    supabase
+      .from("user_subscriptions")
+      .select(
+        "user_id, stripe_customer_id, stripe_subscription_id, stripe_price_id, status, current_period_end, updated_at",
+      )
+      .order("updated_at", { ascending: false })
+      .limit(adminActivityRowLimit),
+    supabase
+      .from("feedback")
+      .select("created_at")
+      .gte("created_at", recentWindow)
+      .limit(adminActivityRowLimit),
+    supabase
+      .from("access_requests")
+      .select("created_at, status")
+      .gte("created_at", recentWindow)
+      .limit(adminActivityRowLimit),
+    supabase
+      .from("response_feedback")
+      .select("reaction")
+      .limit(adminActivityRowLimit),
+    countSupabaseRows(supabase, "chat_sessions", [
+      { method: "gte", column: "updated_at", value: since24h },
+    ]),
+    countSupabaseRows(supabase, "chat_sessions", [
+      { method: "gte", column: "updated_at", value: since7d },
+    ]),
+    countSupabaseRows(supabase, "chat_sessions", [
+      { method: "is", column: "user_id", value: null },
+    ]),
+    countSupabaseRows(supabase, "chat_messages", [
+      { method: "eq", column: "role", value: "user" },
+    ]),
+    countSupabaseRows(supabase, "chat_messages", [
+      { method: "eq", column: "role", value: "assistant" },
+    ]),
+    countSupabaseRows(supabase, "chat_messages", [
+      { method: "gte", column: "created_at", value: since24h },
+    ]),
+    countSupabaseRows(supabase, "chat_messages", [
+      { method: "gte", column: "created_at", value: since7d },
+    ]),
+    countSupabaseRows(supabase, "documents"),
+    countSupabaseRows(supabase, "starred_responses"),
+    countSupabaseRows(supabase, "user_profiles"),
+    countSupabaseRows(supabase, "user_usage"),
+    countSupabaseRows(supabase, "user_subscriptions"),
+  ]);
+
+  for (const result of [
+    sessionsResult,
+    messagesResult,
+    documentsResult,
+    starredResult,
+    profilesResult,
+    usageResult,
+    subscriptionsResult,
+    feedbackActivityResult,
+    accessActivityResult,
+    responseActivityResult,
+  ]) {
+    throwOnSupabaseError(result.error);
+  }
+
+  const messages = ((messagesResult.data || []) as Array<Record<string, unknown>>)
+    .map((row) => ({
+      id: typeof row.id === "string" ? row.id : "",
+      user_id: readJoinedUserId(row.chat_sessions),
+      role: row.role === "assistant" ? "assistant" : "user",
+      created_at: typeof row.created_at === "string" ? row.created_at : "",
+    }))
+    .filter((row): row is AdminMessageActivity => Boolean(row.id));
+
+  return buildAdminDashboardSnapshot({
+    storageMode: "supabase",
+    registrationSource: authUsers.length ? "supabase-auth" : "activity",
+    baseStats,
+    authUsers,
+    sessions: (sessionsResult.data || []) as AdminSessionActivity[],
+    messages,
+    documents: (documentsResult.data || []) as AdminDocumentActivity[],
+    starred: (starredResult.data || []) as AdminStarredActivity[],
+    profiles: (profilesResult.data || []) as AdminProfileActivity[],
+    usage: (usageResult.data || []) as AdminUsageActivity[],
+    subscriptions: (subscriptionsResult.data || []) as StoredUserSubscription[],
+    feedbackActivity: (feedbackActivityResult.data || []) as Array<{
+      created_at: string;
+    }>,
+    accessActivity: (accessActivityResult.data || []) as Array<{
+      created_at: string;
+      status?: string | null;
+    }>,
+    responseActivity: (responseActivityResult.data || []) as Array<{
+      reaction: string;
+    }>,
+    exactCounts: {
+      sessions24h,
+      sessions7d,
+      guestSessions,
+      userMessages,
+      assistantMessages,
+      messages24h,
+      messages7d,
+      documents,
+      starredResponses,
+      profiles,
+      trackedUsage,
+      subscriptions,
+    },
+    recentUserLimit,
+  });
+}
+
+function getSqliteAdminDashboardData(
+  recentUserLimit: number,
+): AdminDashboardData {
+  const database = getDb();
+  const baseStatsRow = database
+    .prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM chat_sessions) AS sessions,
+        (SELECT COUNT(*) FROM chat_messages) AS messages,
+        (SELECT COUNT(*) FROM feedback) AS feedback,
+        COALESCE((SELECT AVG(rating) FROM feedback), 0) AS averageRating,
+        (SELECT COUNT(*) FROM access_requests) AS accessRequests,
+        (SELECT COUNT(*) FROM response_feedback) AS responseActions`,
+    )
+    .get() as AppStats;
+  const countRow = database
+    .prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM chat_sessions WHERE datetime(updated_at) >= datetime('now', '-1 day')) AS sessions24h,
+        (SELECT COUNT(*) FROM chat_sessions WHERE datetime(updated_at) >= datetime('now', '-7 day')) AS sessions7d,
+        (SELECT COUNT(*) FROM chat_sessions WHERE COALESCE(user_id, '') = '') AS guestSessions,
+        (SELECT COUNT(*) FROM chat_messages WHERE role = 'user') AS userMessages,
+        (SELECT COUNT(*) FROM chat_messages WHERE role = 'assistant') AS assistantMessages,
+        (SELECT COUNT(*) FROM chat_messages WHERE datetime(created_at) >= datetime('now', '-1 day')) AS messages24h,
+        (SELECT COUNT(*) FROM chat_messages WHERE datetime(created_at) >= datetime('now', '-7 day')) AS messages7d,
+        (SELECT COUNT(*) FROM documents) AS documents,
+        (SELECT COUNT(*) FROM starred_responses) AS starredResponses,
+        (SELECT COUNT(*) FROM user_profiles) AS profiles,
+        (SELECT COUNT(*) FROM user_usage) AS trackedUsage,
+        (SELECT COUNT(*) FROM user_subscriptions) AS subscriptions`,
+    )
+    .get() as AdminActivityInput["exactCounts"];
+  const sessions = database
+    .prepare(
+      `SELECT id, user_id, title, created_at, updated_at
+       FROM chat_sessions
+       ORDER BY updated_at DESC
+       LIMIT ?`,
+    )
+    .all(adminActivityRowLimit) as AdminSessionActivity[];
+  const messages = database
+    .prepare(
+      `SELECT m.id, COALESCE(s.user_id, '') AS user_id, m.role, m.created_at
+       FROM chat_messages m
+       LEFT JOIN chat_sessions s ON s.id = m.session_id
+       ORDER BY m.created_at DESC
+       LIMIT ?`,
+    )
+    .all(adminActivityRowLimit) as AdminMessageActivity[];
+  const documents = database
+    .prepare(
+      `SELECT id, user_id, size, created_at
+       FROM documents
+       ORDER BY created_at DESC
+       LIMIT ?`,
+    )
+    .all(adminActivityRowLimit) as AdminDocumentActivity[];
+  const starred = database
+    .prepare(
+      `SELECT id, user_id, created_at
+       FROM starred_responses
+       ORDER BY created_at DESC
+       LIMIT ?`,
+    )
+    .all(adminActivityRowLimit) as AdminStarredActivity[];
+  const profiles = database
+    .prepare(
+      `SELECT user_id, display_name, created_at, updated_at
+       FROM user_profiles
+       ORDER BY updated_at DESC
+       LIMIT ?`,
+    )
+    .all(adminActivityRowLimit) as AdminProfileActivity[];
+  const usage = database
+    .prepare(
+      `SELECT user_id, period_started_at, message_count, cooldown_until, updated_at
+       FROM user_usage
+       ORDER BY updated_at DESC
+       LIMIT ?`,
+    )
+    .all(adminActivityRowLimit) as AdminUsageActivity[];
+  const subscriptions = database
+    .prepare(
+      `SELECT user_id, stripe_customer_id, stripe_subscription_id, stripe_price_id, status, current_period_end, updated_at
+       FROM user_subscriptions
+       ORDER BY updated_at DESC
+       LIMIT ?`,
+    )
+    .all(adminActivityRowLimit) as StoredUserSubscription[];
+  const feedbackActivity = database
+    .prepare(
+      `SELECT created_at
+       FROM feedback
+       WHERE datetime(created_at) >= datetime('now', '-13 day')
+       ORDER BY created_at DESC
+       LIMIT ?`,
+    )
+    .all(adminActivityRowLimit) as Array<{ created_at: string }>;
+  const accessActivity = database
+    .prepare(
+      `SELECT created_at, status
+       FROM access_requests
+       WHERE datetime(created_at) >= datetime('now', '-13 day')
+       ORDER BY created_at DESC
+       LIMIT ?`,
+    )
+    .all(adminActivityRowLimit) as Array<{
+      created_at: string;
+      status?: string | null;
+    }>;
+  const responseActivity = database
+    .prepare("SELECT reaction FROM response_feedback")
+    .all() as Array<{ reaction: string }>;
+
+  return buildAdminDashboardSnapshot({
+    storageMode: "sqlite",
+    registrationSource: "activity",
+    baseStats: {
+      sessions: Number(baseStatsRow.sessions || 0),
+      messages: Number(baseStatsRow.messages || 0),
+      feedback: Number(baseStatsRow.feedback || 0),
+      averageRating: Number(baseStatsRow.averageRating || 0),
+      accessRequests: Number(baseStatsRow.accessRequests || 0),
+      responseActions: Number(baseStatsRow.responseActions || 0),
+    },
+    authUsers: [],
+    sessions,
+    messages,
+    documents,
+    starred,
+    profiles,
+    usage,
+    subscriptions,
+    feedbackActivity,
+    accessActivity,
+    responseActivity,
+    exactCounts: {
+      sessions24h: Number(countRow.sessions24h || 0),
+      sessions7d: Number(countRow.sessions7d || 0),
+      guestSessions: Number(countRow.guestSessions || 0),
+      userMessages: Number(countRow.userMessages || 0),
+      assistantMessages: Number(countRow.assistantMessages || 0),
+      messages24h: Number(countRow.messages24h || 0),
+      messages7d: Number(countRow.messages7d || 0),
+      documents: Number(countRow.documents || 0),
+      starredResponses: Number(countRow.starredResponses || 0),
+      profiles: Number(countRow.profiles || 0),
+      trackedUsage: Number(countRow.trackedUsage || 0),
+      subscriptions: Number(countRow.subscriptions || 0),
+    },
+    recentUserLimit,
+  });
+}
+
+export async function getAdminDashboardData(
+  recentUserLimit = 24,
+): Promise<AdminDashboardData> {
+  if (shouldUseSupabase()) {
+    try {
+      return await getSupabaseAdminDashboardData(recentUserLimit);
+    } catch (error) {
+      reportSupabaseError("getAdminDashboardData", error);
+    }
+  }
+
+  return getSqliteAdminDashboardData(recentUserLimit);
 }
 
 export async function getRecentAccessRequests(
@@ -1033,6 +2367,12 @@ export async function setStarredResponse(input: {
 }
 
 export async function getUserProfile(userId: string): Promise<UserProfile> {
+  const cached = await getCacheJson<UserProfile>(userProfileCacheKey(userId));
+
+  if (cached) {
+    return cached;
+  }
+
   if (shouldUseSupabase()) {
     try {
       const { data, error } = await createSupabaseAdminClient()
@@ -1044,7 +2384,9 @@ export async function getUserProfile(userId: string): Promise<UserProfile> {
       throwOnSupabaseError(error);
 
       if (data) {
-        return data as UserProfile;
+        const profile = data as UserProfile;
+        await setCacheJson(userProfileCacheKey(userId), profile, 180);
+        return profile;
       }
     } catch (error) {
       reportSupabaseError("getUserProfile", error);
@@ -1059,15 +2401,17 @@ export async function getUserProfile(userId: string): Promise<UserProfile> {
     )
     .get(userId) as UserProfile | undefined;
 
-  return (
+  const profile =
     existing || {
       user_id: userId,
       display_name: "",
       memory: "",
       created_at: "",
       updated_at: "",
-    }
-  );
+    };
+
+  await setCacheJson(userProfileCacheKey(userId), profile, 180);
+  return profile;
 }
 
 export async function saveUserProfile(input: {
@@ -1077,6 +2421,7 @@ export async function saveUserProfile(input: {
 }) {
   const displayName = input.displayName.slice(0, 80).trim();
   const memory = input.memory.slice(0, 4000).trim();
+  await deleteCache(userProfileCacheKey(input.userId));
 
   if (shouldUseSupabase()) {
     try {
@@ -1109,6 +2454,7 @@ export async function saveUserProfile(input: {
          updated_at = datetime('now')`,
     )
     .run(input.userId, displayName, memory);
+  await deleteCache(userProfileCacheKey(input.userId));
 }
 
 export async function getRecentMessages(limit = 100): Promise<StoredMessage[]> {
@@ -1135,6 +2481,374 @@ export async function getRecentMessages(limit = 100): Promise<StoredMessage[]> {
        LIMIT ?`,
     )
     .all(limit) as StoredMessage[];
+}
+
+function readJoinedUserId(value: unknown) {
+  if (!value) {
+    return "";
+  }
+
+  const record = Array.isArray(value) ? value[0] : value;
+
+  if (!record || typeof record !== "object" || Array.isArray(record)) {
+    return "";
+  }
+
+  const userId = (record as Record<string, unknown>).user_id;
+  return typeof userId === "string" ? userId : "";
+}
+
+function groupUserPatternRows(
+  rows: Array<PromptPatternInput & { user_id: string }>,
+  limit: number,
+): UserPromptPattern[] {
+  const grouped = new Map<string, PromptPatternInput[]>();
+
+  for (const row of rows) {
+    const userId = row.user_id.trim();
+
+    if (!userId) {
+      continue;
+    }
+
+    const prompts = grouped.get(userId) || [];
+    prompts.push({ content: row.content, created_at: row.created_at });
+    grouped.set(userId, prompts);
+  }
+
+  return [...grouped.entries()]
+    .map(([userId, prompts]) => ({
+      user_id: userId,
+      ...analyzePromptPatterns(prompts),
+    }))
+    .sort((a, b) => (b.lastActive || "").localeCompare(a.lastActive || ""))
+    .slice(0, limit);
+}
+
+export async function getUserPromptPatternProfile(
+  userId: string,
+  limit = 80,
+): Promise<PromptPatternProfile> {
+  if (shouldUseSupabase()) {
+    try {
+      const { data, error } = await createSupabaseAdminClient()
+        .from("chat_messages")
+        .select("content, created_at, chat_sessions!inner(user_id)")
+        .eq("role", "user")
+        .eq("chat_sessions.user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      throwOnSupabaseError(error);
+
+      return analyzePromptPatterns(
+        (data || []).map((row) => ({
+          content: typeof row.content === "string" ? row.content : "",
+          created_at:
+            typeof row.created_at === "string" ? row.created_at : "",
+        })),
+      );
+    } catch (error) {
+      reportSupabaseError("getUserPromptPatternProfile", error);
+    }
+  }
+
+  const rows = getDb()
+    .prepare(
+      `SELECT m.content, m.created_at
+       FROM chat_messages m
+       INNER JOIN chat_sessions s ON s.id = m.session_id
+       WHERE m.role = 'user'
+         AND s.user_id = ?
+       ORDER BY m.created_at DESC
+       LIMIT ?`,
+    )
+    .all(userId, limit) as PromptPatternInput[];
+
+  return analyzePromptPatterns(rows);
+}
+
+function createUserGfMemo(
+  userId: string,
+  profile: PromptPatternProfile,
+  updatedAt = new Date().toISOString(),
+): UserGfMemo {
+  return {
+    user_id: userId,
+    ...profile,
+    summary: formatGfMemoMemory(profile).slice(0, 4000),
+    updated_at: updatedAt,
+  };
+}
+
+function readGfMemoJson(value: unknown) {
+  if (!value) {
+    return {};
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  }
+
+  return typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function readStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function readIntentMix(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return null;
+      }
+
+      const record = item as Record<string, unknown>;
+      const label = typeof record.label === "string" ? record.label : "";
+      const count = Number(record.count || 0);
+
+      return label && Number.isFinite(count)
+        ? { label, count: Math.max(0, Math.round(count)) }
+        : null;
+    })
+    .filter((item): item is { label: string; count: number } => item !== null);
+}
+
+function normalizeGfMemoRow(
+  userId: string,
+  row: Record<string, unknown> | null | undefined,
+): UserGfMemo | null {
+  if (!row) {
+    return null;
+  }
+
+  const memoJson = readGfMemoJson(row.memo_json);
+  const promptCount = Math.max(0, Number(row.prompt_count || memoJson.promptCount || 0));
+  const profile: PromptPatternProfile = {
+    promptCount,
+    averageWords: Math.max(0, Number(memoJson.averageWords || 0)),
+    lastActive:
+      typeof memoJson.lastActive === "string" ? memoJson.lastActive : "",
+    topTopics: readStringArray(memoJson.topTopics),
+    intentMix: readIntentMix(memoJson.intentMix),
+    styleSignals: readStringArray(memoJson.styleSignals),
+    responseProfile:
+      typeof memoJson.responseProfile === "string"
+        ? memoJson.responseProfile
+        : "",
+    samplePrompt:
+      typeof memoJson.samplePrompt === "string"
+        ? memoJson.samplePrompt
+        : typeof row.last_prompt_excerpt === "string"
+          ? row.last_prompt_excerpt
+          : "",
+  };
+  const summary =
+    typeof row.summary === "string" && row.summary
+      ? row.summary
+      : formatGfMemoMemory(profile).slice(0, 4000);
+
+  return {
+    user_id: userId,
+    ...profile,
+    summary,
+    updated_at:
+      typeof row.updated_at === "string" ? row.updated_at : new Date().toISOString(),
+  };
+}
+
+async function saveUserGfMemo(memo: UserGfMemo) {
+  const memoJson = JSON.stringify({
+    promptCount: memo.promptCount,
+    averageWords: memo.averageWords,
+    lastActive: memo.lastActive,
+    topTopics: memo.topTopics,
+    intentMix: memo.intentMix,
+    styleSignals: memo.styleSignals,
+    responseProfile: memo.responseProfile,
+    samplePrompt: memo.samplePrompt,
+  });
+  await deleteCache(userGfMemoCacheKey(memo.user_id));
+
+  if (shouldUseSupabase()) {
+    try {
+      const { error } = await createSupabaseAdminClient()
+        .from("gf_memo")
+        .upsert(
+          {
+            user_id: memo.user_id,
+            memo_json: memoJson,
+            summary: memo.summary,
+            prompt_count: memo.promptCount,
+            last_prompt_excerpt: memo.samplePrompt.slice(0, 240),
+            updated_at: memo.updated_at,
+          },
+          { onConflict: "user_id" },
+        );
+
+      throwOnSupabaseError(error);
+      await setCacheJson(userGfMemoCacheKey(memo.user_id), memo, 180);
+      return;
+    } catch (error) {
+      if (!isMissingGfMemoSchema(error)) {
+        reportSupabaseError("saveUserGfMemo", error);
+      }
+    }
+  }
+
+  getDb()
+    .prepare(
+      `INSERT INTO gf_memo (
+         user_id,
+         memo_json,
+         summary,
+         prompt_count,
+         last_prompt_excerpt,
+         updated_at
+       )
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         memo_json = excluded.memo_json,
+         summary = excluded.summary,
+         prompt_count = excluded.prompt_count,
+         last_prompt_excerpt = excluded.last_prompt_excerpt,
+         updated_at = excluded.updated_at`,
+    )
+    .run(
+      memo.user_id,
+      memoJson,
+      memo.summary,
+      memo.promptCount,
+      memo.samplePrompt.slice(0, 240),
+      memo.updated_at,
+    );
+  await setCacheJson(userGfMemoCacheKey(memo.user_id), memo, 180);
+}
+
+export async function getUserGfMemo(userId: string): Promise<UserGfMemo | null> {
+  const cached = await getCacheJson<UserGfMemo>(userGfMemoCacheKey(userId));
+
+  if (cached) {
+    return cached;
+  }
+
+  if (shouldUseSupabase()) {
+    try {
+      const { data, error } = await createSupabaseAdminClient()
+        .from("gf_memo")
+        .select(
+          "user_id, memo_json, summary, prompt_count, last_prompt_excerpt, updated_at",
+        )
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      throwOnSupabaseError(error);
+      const memo = normalizeGfMemoRow(userId, data as Record<string, unknown> | null);
+
+      if (memo) {
+        await setCacheJson(userGfMemoCacheKey(userId), memo, 180);
+      }
+
+      return memo;
+    } catch (error) {
+      if (!isMissingGfMemoSchema(error)) {
+        reportSupabaseError("getUserGfMemo", error);
+      }
+    }
+  }
+
+  const row = getDb()
+    .prepare(
+      `SELECT user_id, memo_json, summary, prompt_count, last_prompt_excerpt, updated_at
+       FROM gf_memo
+       WHERE user_id = ?`,
+    )
+    .get(userId) as Record<string, unknown> | undefined;
+
+  const memo = normalizeGfMemoRow(userId, row);
+
+  if (memo) {
+    await setCacheJson(userGfMemoCacheKey(userId), memo, 180);
+  }
+
+  return memo;
+}
+
+export async function updateUserGfMemo(
+  userId: string,
+  limit = 100,
+): Promise<UserGfMemo> {
+  const memo = createUserGfMemo(
+    userId,
+    await getUserPromptPatternProfile(userId, limit),
+  );
+
+  await saveUserGfMemo(memo);
+  return memo;
+}
+
+export async function getRecentUserPromptPatterns(
+  limit = 12,
+): Promise<UserPromptPattern[]> {
+  const rowLimit = Math.max(limit * 80, 120);
+
+  if (shouldUseSupabase()) {
+    try {
+      const { data, error } = await createSupabaseAdminClient()
+        .from("chat_messages")
+        .select("content, created_at, chat_sessions!inner(user_id)")
+        .eq("role", "user")
+        .not("chat_sessions.user_id", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(rowLimit);
+
+      throwOnSupabaseError(error);
+
+      return groupUserPatternRows(
+        (data || []).map((row) => ({
+          user_id: readJoinedUserId(
+            (row as Record<string, unknown>).chat_sessions,
+          ),
+          content: typeof row.content === "string" ? row.content : "",
+          created_at:
+            typeof row.created_at === "string" ? row.created_at : "",
+        })),
+        limit,
+      );
+    } catch (error) {
+      reportSupabaseError("getRecentUserPromptPatterns", error);
+    }
+  }
+
+  const rows = getDb()
+    .prepare(
+      `SELECT s.user_id, m.content, m.created_at
+       FROM chat_messages m
+       INNER JOIN chat_sessions s ON s.id = m.session_id
+       WHERE m.role = 'user'
+         AND COALESCE(s.user_id, '') <> ''
+       ORDER BY m.created_at DESC
+       LIMIT ?`,
+    )
+    .all(rowLimit) as Array<PromptPatternInput & { user_id: string }>;
+
+  return groupUserPatternRows(rows, limit);
 }
 
 export async function getRandomSexualHealthFacts(
@@ -1452,6 +3166,7 @@ async function saveUserUsageRow(row: StoredUserUsage) {
     ...row,
     updated_at: new Date().toISOString(),
   });
+  await deleteCache(userUsageCacheKey(normalized.user_id));
 
   if (shouldUseSupabase()) {
     try {
@@ -1488,6 +3203,14 @@ async function saveUserUsageRow(row: StoredUserUsage) {
 export async function getUserSubscription(
   userId: string,
 ): Promise<StoredUserSubscription> {
+  const cached = await getCacheJson<StoredUserSubscription>(
+    userSubscriptionCacheKey(userId),
+  );
+
+  if (cached) {
+    return normalizeSubscriptionRow(userId, cached);
+  }
+
   if (shouldUseSupabase()) {
     try {
       const { data, error } = await createSupabaseAdminClient()
@@ -1499,7 +3222,12 @@ export async function getUserSubscription(
         .maybeSingle();
 
       throwOnSupabaseError(error);
-      return normalizeSubscriptionRow(userId, data as StoredUserSubscription);
+      const subscription = normalizeSubscriptionRow(
+        userId,
+        data as StoredUserSubscription,
+      );
+      await setCacheJson(userSubscriptionCacheKey(userId), subscription, 120);
+      return subscription;
     } catch (error) {
       reportSupabaseError("getUserSubscription", error);
     }
@@ -1513,7 +3241,9 @@ export async function getUserSubscription(
     )
     .get(userId) as StoredUserSubscription | undefined;
 
-  return normalizeSubscriptionRow(userId, row);
+  const subscription = normalizeSubscriptionRow(userId, row);
+  await setCacheJson(userSubscriptionCacheKey(userId), subscription, 120);
+  return subscription;
 }
 
 async function normalizeFreeUsageWindow(userId: string) {
@@ -1547,6 +3277,26 @@ async function normalizeFreeUsageWindow(userId: string) {
 export async function getUserUsageStatus(
   userId: string,
 ): Promise<UserUsageStatus> {
+  const cached = await getCacheJson<UserUsageStatus>(userUsageCacheKey(userId));
+
+  if (cached) {
+    return {
+      ...cached,
+      cooldownSecondsRemaining:
+        cached.cooldownUntil && cached.plan === "free"
+          ? secondsUntil(cached.cooldownUntil)
+          : cached.cooldownSecondsRemaining,
+      isLimited:
+        cached.plan === "free"
+          ? Boolean(
+              (cached.cooldownUntil && secondsUntil(cached.cooldownUntil) > 0) ||
+                ((cached.messagesLimit ?? freeMessageLimit) !== null &&
+                  cached.messagesUsed >= (cached.messagesLimit ?? freeMessageLimit)),
+            )
+          : false,
+    };
+  }
+
   const [subscription, usage] = await Promise.all([
     getUserSubscription(userId),
     normalizeFreeUsageWindow(userId),
@@ -1565,7 +3315,7 @@ export async function getUserUsageStatus(
     ? null
     : Math.max(0, freeMessageLimit - messagesUsed);
 
-  return {
+  const status = {
     plan,
     messagesUsed,
     messagesLimit: hasPaidPlan ? null : freeMessageLimit,
@@ -1578,6 +3328,14 @@ export async function getUserUsageStatus(
       ? false
       : cooldownSecondsRemaining > 0 || messagesUsed >= freeMessageLimit,
   };
+
+  await setCacheJson(
+    userUsageCacheKey(userId),
+    status,
+    hasPaidPlan ? 120 : Math.min(60, Math.max(5, cooldownSecondsRemaining || 30)),
+  );
+
+  return status;
 }
 
 export async function getUserMessageAllowance(userId: string) {
@@ -1620,6 +3378,8 @@ export async function upsertUserSubscription(input: {
   status?: string | null;
   currentPeriodEnd?: string | null;
 }) {
+  await deleteCache(userSubscriptionCacheKey(input.userId));
+  await deleteCache(userUsageCacheKey(input.userId));
   const row = normalizeSubscriptionRow(input.userId, {
     user_id: input.userId,
     stripe_customer_id: input.stripeCustomerId || "",

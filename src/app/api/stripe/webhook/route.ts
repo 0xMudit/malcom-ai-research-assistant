@@ -1,61 +1,13 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import {
-  findSubscriptionOwnerByStripeIds,
-  upsertUserSubscription,
-} from "@/lib/database";
+  idFromStripeValue,
+  saveStripeSubscription,
+} from "@/lib/billing";
 import { getStripeClient } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function idFromStripeValue(value: string | { id: string } | null | undefined) {
-  if (!value) {
-    return "";
-  }
-
-  return typeof value === "string" ? value : value.id;
-}
-
-function subscriptionPeriodEnd(subscription: Stripe.Subscription) {
-  const topLevelPeriodEnd = (subscription as unknown as {
-    current_period_end?: unknown;
-  }).current_period_end;
-  const periodEnd =
-    typeof topLevelPeriodEnd === "number"
-      ? topLevelPeriodEnd
-      : subscription.items.data[0]?.current_period_end;
-
-  return typeof periodEnd === "number"
-    ? new Date(periodEnd * 1000).toISOString()
-    : null;
-}
-
-async function saveSubscription(subscription: Stripe.Subscription, userIdHint = "") {
-  const stripeSubscriptionId = subscription.id;
-  const stripeCustomerId = idFromStripeValue(subscription.customer);
-  const userId =
-    userIdHint ||
-    subscription.metadata?.user_id ||
-    (await findSubscriptionOwnerByStripeIds({
-      stripeCustomerId,
-      stripeSubscriptionId,
-    })) ||
-    "";
-
-  if (!userId) {
-    return;
-  }
-
-  await upsertUserSubscription({
-    userId,
-    stripeCustomerId,
-    stripeSubscriptionId,
-    stripePriceId: subscription.items.data[0]?.price.id || "",
-    status: subscription.status,
-    currentPeriodEnd: subscriptionPeriodEnd(subscription),
-  });
-}
 
 export async function POST(request: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -97,7 +49,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (event.type === "checkout.session.completed") {
+    if (
+      event.type === "checkout.session.completed" ||
+      event.type === "checkout.session.async_payment_succeeded"
+    ) {
       const session = event.data.object as Stripe.Checkout.Session;
       const subscriptionId = idFromStripeValue(session.subscription);
       const userId = session.metadata?.user_id || session.client_reference_id || "";
@@ -107,7 +62,7 @@ export async function POST(request: Request) {
           subscriptionId,
         );
 
-        await saveSubscription(subscription, userId);
+        await saveStripeSubscription(subscription, userId);
       }
     }
 
@@ -116,7 +71,7 @@ export async function POST(request: Request) {
       event.type === "customer.subscription.updated" ||
       event.type === "customer.subscription.deleted"
     ) {
-      await saveSubscription(event.data.object as Stripe.Subscription);
+      await saveStripeSubscription(event.data.object as Stripe.Subscription);
     }
   } catch (error) {
     return NextResponse.json(

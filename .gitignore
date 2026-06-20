@@ -12,9 +12,14 @@
 
 # testing
 /coverage
+/test-results/
+/mobile-audit/
 
 # next.js
 /.next/
+/.next-build-*/
+/.next-rollback-*/
+/.deploy-work-*/
 /.next-dev/
 /out/
 
@@ -36,6 +41,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel

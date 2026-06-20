@@ -11,11 +11,11 @@ const siteUrl = new URL(
 export const metadata: Metadata = {
   metadataBase: siteUrl,
   title: {
-    default: "Malcom — AI Research Command Center",
+    default: "Malcom — All-Round AI Workspace",
     template: "%s | Malcom",
   },
   description:
-    "Malcom is an AI-powered research workspace for engineers, scientists, builders, and serious learners. Analyze documents, render math, review code, and synthesize technical ideas faster.",
+    "Malcom is an all-round AI workspace for asking, writing, coding, planning, learning, analyzing documents, rendering math, and turning messy ideas into clear next steps.",
   alternates: {
     canonical: "/",
   },
@@ -28,9 +28,9 @@ export const metadata: Metadata = {
     apple: "/icon.svg",
   },
   openGraph: {
-    title: "Malcom — AI Research Command Center",
+    title: "Malcom — All-Round AI Workspace",
     description:
-      "AI-powered research workspace for documents, math, code, and technical synthesis.",
+      "AI workspace for questions, documents, math, code, planning, learning, and practical synthesis.",
     url: "/",
     siteName: "Malcom",
     images: [
@@ -38,16 +38,16 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Malcom AI research command center",
+        alt: "Malcom all-round AI workspace",
       },
     ],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Malcom — AI Research Command Center",
+    title: "Malcom — All-Round AI Workspace",
     description:
-      "AI-powered research workspace for documents, math, code, and technical synthesis.",
+      "AI workspace for questions, documents, math, code, planning, learning, and practical synthesis.",
     images: ["/og-image.png"],
   },
 };

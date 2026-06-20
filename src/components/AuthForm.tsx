@@ -3,10 +3,20 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { Eye, EyeOff, Mail } from "lucide-react";
+import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
+import { readApiJson } from "@/lib/api-client";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import styles from "@/app/app-pages.module.css";
+
+type AuthPayload = {
+  user?: (User & { identities?: unknown[] }) | null;
+  session?: Session | null;
+};
+
+function getOAuthCallbackUrl() {
+  return new URL("/auth/callback", window.location.origin).toString();
+}
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
@@ -45,7 +55,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             password,
           }),
         });
-        const payload = await response.json();
+        const payload = await readApiJson<AuthPayload>(
+          response,
+          "Account could not be created.",
+        );
 
         if (!response.ok) {
           const errorMessage = payload.error || "Account could not be created.";
@@ -90,7 +103,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         }
       }
 
-      router.push("/");
+      router.push("/new");
       router.refresh();
     } catch (caughtError) {
       setStatus(
@@ -103,6 +116,38 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     }
   }
 
+  async function continueWithGoogle() {
+    const supabase = supabaseRef.current;
+
+    if (!supabase) {
+      setStatus("Supabase is not configured.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setStatus("Redirecting to Google...");
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: getOAuthCallbackUrl(),
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (caughtError) {
+      setStatus(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Google sign-in failed.",
+      );
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <section className={styles.formCard}>
       <h2>{formMode === "register" ? "Create account" : "Log in"}</h2>
@@ -111,6 +156,24 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           ? "Save chats, sync documents, and continue research across devices."
           : "Access saved chats, account usage, profile memory, and billing."}
       </p>
+
+      <button
+        className={styles.oauthButton}
+        type="button"
+        onClick={continueWithGoogle}
+        disabled={isSubmitting}
+      >
+        <Mail size={16} />
+        <span>
+          {formMode === "register"
+            ? "Sign up with Google"
+            : "Log in with Google"}
+        </span>
+      </button>
+
+      <div className={styles.authDivider} aria-hidden="true">
+        <span>or</span>
+      </div>
 
       <form className={styles.form} onSubmit={submit}>
         <label>

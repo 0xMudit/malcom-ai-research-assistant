@@ -2,7 +2,8 @@
   min-height: 100dvh;
   color: var(--foreground);
   background:
-    radial-gradient(circle at 18% 0%, rgba(62, 207, 142, 0.1), transparent 30%),
+    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 38%),
+    radial-gradient(circle at 18% 0%, color-mix(in oklch, var(--primary), transparent 90%), transparent 30%),
     var(--background);
 }
 
@@ -25,6 +26,7 @@
 }
 
 .brandMark {
+  position: relative;
   display: grid;
   place-items: center;
   width: 34px;
@@ -33,6 +35,23 @@
   border-radius: 10px;
   color: var(--primary);
   background: color-mix(in oklch, var(--primary), transparent 91%);
+}
+
+.brandMark small {
+  position: absolute;
+  top: -8px;
+  right: -17px;
+  min-height: 16px;
+  padding: 2px 5px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 34%);
+  border-radius: 999px;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  font-size: 9px;
+  font-weight: 820;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
 }
 
 .topbar nav,
@@ -87,10 +106,10 @@
   border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
   border-radius: var(--radius-lg);
   background:
-    linear-gradient(135deg, color-mix(in oklch, var(--primary), transparent 90%), transparent 42%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 62%),
+    linear-gradient(135deg, color-mix(in oklch, var(--primary), transparent 92%), transparent 42%),
     color-mix(in oklch, var(--card), transparent 5%);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
 }
 
 .dashboardHero div {
@@ -130,7 +149,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 50%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 50%),
     color-mix(in oklch, var(--sidebar), black 1%);
 }
 
@@ -213,6 +232,107 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.statusCard,
+.statusDetails {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 58%),
+    color-mix(in oklch, var(--card), transparent 5%);
+}
+
+.statusCard > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.statusCard h2,
+.statusDetails h2 {
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.statusCard p,
+.statusDetails p {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 780;
+  text-transform: uppercase;
+}
+
+.statusok {
+  color: var(--primary);
+  border-color: color-mix(in oklch, var(--primary), transparent 54%);
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+}
+
+.statuswarn {
+  color: var(--warning);
+  border-color: color-mix(in oklch, var(--warning), transparent 58%);
+  background: color-mix(in oklch, var(--warning), transparent 90%);
+}
+
+.statusfail {
+  color: var(--destructive-foreground);
+  border-color: color-mix(in oklch, var(--destructive), transparent 45%);
+  background: color-mix(in oklch, var(--destructive), transparent 82%);
+}
+
+.statusDetails {
+  margin-top: 14px;
+}
+
+.checkList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.checkList span {
+  min-height: 30px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted-foreground);
+  background: var(--secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.checkList span[data-ok="true"] {
+  color: var(--primary);
+  border-color: color-mix(in oklch, var(--primary), transparent 60%);
+  background: color-mix(in oklch, var(--primary), transparent 92%);
 }
 
 .dashboardGrid {
@@ -310,6 +430,55 @@
   display: grid;
   gap: 14px;
   padding: 18px;
+}
+
+.oauthButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--foreground);
+  background: var(--secondary);
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.oauthButton:hover:not(:disabled) {
+  border-color: color-mix(in oklch, var(--primary), transparent 58%);
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+  transform: translateY(-1px);
+}
+
+.oauthButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.authDivider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.authDivider::before,
+.authDivider::after {
+  content: "";
+  height: 1px;
+  background: var(--border);
 }
 
 .form {
@@ -480,6 +649,7 @@
   }
 
   .grid,
+  .statusGrid,
   .dashboardGrid,
   .metricGrid {
     grid-template-columns: 1fr;

@@ -3,9 +3,17 @@
   padding: 28px;
   color: var(--foreground);
   background:
-    linear-gradient(135deg, rgba(48, 68, 115, 0.18), transparent 38%),
-    radial-gradient(circle at 78% 0%, color-mix(in oklch, var(--primary), transparent 88%), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 260px),
     var(--background);
+}
+
+.header,
+.metrics,
+.statusGrid,
+.twoColumn,
+.panel {
+  width: min(1280px, 100%);
+  margin-inline: auto;
 }
 
 .header {
@@ -13,85 +21,448 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
-  margin: 0 auto 22px;
-  width: min(1180px, 100%);
+  margin-bottom: 18px;
 }
 
 .header p,
 .header span,
-.stats span {
+.loginIntro > span,
+.loginIntro p,
+.loginField span,
+.metricCard span,
+.metricCard p,
+.panelHeader p,
+.panelHeader span,
+.statusCell span,
+.statusCell p,
+.summaryGrid span,
+.summaryGrid p,
+.patternCard span,
+.patternCard footer,
+.userCell span,
+.tableWrap small,
+.dayBar p,
+.emptyPanel,
+.emptyCell {
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.4;
 }
 
-.header h1 {
-  margin-top: 5px;
-  color: var(--foreground);
-  font-size: 30px;
-  line-height: 1.1;
-  letter-spacing: 0;
-}
-
-.header span {
-  padding: 7px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: color-mix(in oklch, var(--card), transparent 8%);
-}
-
-.stats,
-.grid,
-.panel {
-  width: min(1180px, 100%);
-  margin-inline: auto;
-}
-
-.stats {
+.loginShell {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
+  place-items: center;
+  padding: 18px;
 }
 
-.stats div,
-.panel {
+.loginPanel {
+  display: grid;
+  gap: 22px;
+  width: min(430px, 100%);
+  padding: 24px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: color-mix(in oklch, var(--card), transparent 4%);
-  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
 }
 
-.stats div {
+.loginIntro {
   display: grid;
-  gap: 6px;
+  gap: 8px;
+}
+
+.loginIcon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 2px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 52%);
+  border-radius: var(--radius);
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary), transparent 86%);
+}
+
+.loginIntro h1 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 30px;
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.loginForm {
+  display: grid;
+  gap: 14px;
+}
+
+.loginField {
+  display: grid;
+  gap: 7px;
+}
+
+.loginField > div {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--background), transparent 8%);
+}
+
+.loginField svg {
+  color: var(--muted-foreground);
+}
+
+.loginField input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--foreground);
+  background: transparent;
+}
+
+.loginField input::placeholder {
+  color: color-mix(in oklch, var(--muted-foreground), transparent 22%);
+}
+
+.loginField:focus-within > div {
+  border-color: color-mix(in oklch, var(--primary), transparent 24%);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary), transparent 84%);
+}
+
+.loginMessage {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklch, var(--destructive), transparent 30%);
+  border-radius: var(--radius);
+  color: var(--destructive-foreground);
+  background: color-mix(in oklch, var(--destructive), transparent 80%);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.loginMessage svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.loginButton,
+.logoutButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 38%);
+  border-radius: var(--radius);
+  color: var(--primary-foreground);
+  background: var(--primary);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.loginButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.logoutButton {
+  min-height: 32px;
+  padding: 6px 10px;
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--card), transparent 8%);
+}
+
+.logoutButton:hover {
+  border-color: color-mix(in oklch, var(--destructive), transparent 34%);
+  color: var(--destructive-foreground);
+  background: color-mix(in oklch, var(--destructive), transparent 74%);
+}
+
+.header h1 {
+  margin: 4px 0 6px;
+  color: var(--foreground);
+  font-size: clamp(26px, 3vw, 38px);
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.headerBadges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.headerBadges span,
+.panelHeader > span,
+.logoutButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--card), transparent 8%);
+  font-weight: 700;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.metricCard,
+.statusCell,
+.panel,
+.summaryGrid article {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--card), transparent 4%);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+}
+
+.metricCard {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  min-height: 122px;
   padding: 14px;
 }
 
-.stats strong {
-  font-size: 28px;
-  line-height: 1;
+.metricIcon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 58%);
+  border-radius: var(--radius);
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
 }
 
-.grid {
+.metricCard div:last-child {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: 14px;
-  margin-top: 14px;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.metricCard strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 29px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metricdefault {
+  border-color: var(--border);
+}
+
+.metricgood {
+  border-color: color-mix(in oklch, var(--primary), transparent 55%);
+}
+
+.metricwarn {
+  border-color: color-mix(in oklch, var(--warning), transparent 45%);
+}
+
+.metricbad {
+  border-color: color-mix(in oklch, var(--destructive), transparent 45%);
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.statusCell {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 13px;
+}
+
+.statusCell > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.statusCell svg {
+  color: var(--primary);
+}
+
+.statusPill,
+.planPill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 24px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: capitalize;
+}
+
+.statusOk {
+  color: var(--primary);
+  border-color: color-mix(in oklch, var(--primary), transparent 46%);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+}
+
+.statusWarn {
+  color: var(--warning-foreground);
+  border-color: color-mix(in oklch, var(--warning), transparent 34%);
+  background: color-mix(in oklch, var(--warning), transparent 72%);
+}
+
+.statusFail {
+  color: var(--destructive-foreground);
+  border-color: color-mix(in oklch, var(--destructive), transparent 28%);
+  background: color-mix(in oklch, var(--destructive), transparent 70%);
+}
+
+.twoColumn {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .panel {
   min-width: 0;
   overflow: hidden;
+  margin-bottom: 10px;
 }
 
-.panel h2 {
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
+}
+
+.panelHeader h2 {
+  margin: 0;
   color: var(--foreground);
   font-size: 15px;
-  line-height: 1.3;
+  line-height: 1.25;
   letter-spacing: 0;
+}
+
+.panelHeader p {
+  margin-top: 4px;
+}
+
+.timeline {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(54px, 1fr));
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px;
+  scrollbar-width: thin;
+}
+
+.dayBar {
+  display: grid;
+  grid-template-rows: 104px auto auto;
+  gap: 6px;
+  min-width: 54px;
+}
+
+.barStack {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  height: 104px;
+  padding: 8px 5px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--background), transparent 16%);
+}
+
+.barStack span {
+  display: block;
+  width: 9px;
+  min-height: 4px;
+  border-radius: 4px 4px 0 0;
+}
+
+.barMessages {
+  background: var(--primary);
+}
+
+.barSessions {
+  background: #79b8ff;
+}
+
+.barSignups {
+  background: var(--warning);
+}
+
+.dayBar strong {
+  color: var(--foreground);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.summaryGrid,
+.responseStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+
+.summaryGrid article,
+.responseStats article {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.summaryGrid strong,
+.responseStats strong {
+  color: var(--foreground);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.responseStats article {
+  border: 1px solid color-mix(in oklch, var(--border), transparent 16%);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--background), transparent 14%);
+}
+
+.responseStats svg {
+  color: var(--primary);
 }
 
 .tableWrap {
@@ -101,7 +472,7 @@
 
 .tableWrap table {
   width: 100%;
-  min-width: 680px;
+  min-width: 760px;
   border-collapse: collapse;
 }
 
@@ -118,31 +489,154 @@
 
 .tableWrap th {
   color: var(--muted-foreground);
-  font-weight: 650;
+  font-size: 12px;
+  font-weight: 750;
 }
 
-.status {
-  display: inline-flex;
-  align-items: center;
+.tableWrap td {
+  overflow-wrap: anywhere;
+}
+
+.tableWrap small {
+  display: block;
+  margin-top: 4px;
+}
+
+.userCell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.userCell strong {
+  color: var(--foreground);
+}
+
+.emailCell {
+  min-width: 190px;
+  overflow-wrap: anywhere;
+}
+
+.planFree {
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--secondary), transparent 12%);
+}
+
+.planPro {
+  color: #cfe8ff;
+  border-color: color-mix(in oklch, #79b8ff, transparent 32%);
+  background: color-mix(in oklch, #79b8ff, transparent 78%);
+}
+
+.planEnterprise {
+  color: var(--warning-foreground);
+  border-color: color-mix(in oklch, var(--warning), transparent 32%);
+  background: color-mix(in oklch, var(--warning), transparent 72%);
+}
+
+.planUnknown {
+  color: var(--destructive-foreground);
+  border-color: color-mix(in oklch, var(--destructive), transparent 32%);
+  background: color-mix(in oklch, var(--destructive), transparent 72%);
+}
+
+.patternGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+
+.patternCard {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 16%);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--background), transparent 12%);
+}
+
+.patternCard > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.patternCard strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intentPills,
+.topicList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.intentPills span,
+.topicList span {
   min-height: 24px;
-  padding: 0 9px;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 52%);
-  border-radius: 999px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: var(--radius);
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--secondary), transparent 12%);
+  font-weight: 750;
+}
+
+.intentPills span:first-child {
   color: var(--primary);
+  border-color: color-mix(in oklch, var(--primary), transparent 52%);
   background: color-mix(in oklch, var(--primary), transparent 88%);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: capitalize;
+}
+
+.profileText {
+  display: -webkit-box;
+  min-height: 58px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.patternCard footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 3px;
+  border-top: 1px solid color-mix(in oklch, var(--border), transparent 22%);
+}
+
+.emptyPanel {
+  grid-column: 1 / -1;
+  padding: 14px;
+}
+
+.emptyCell {
+  padding: 18px 14px;
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
-  min-width: 220px;
+  min-width: 260px;
 }
 
 .actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-height: 30px;
   padding: 0 10px;
   border: 1px solid var(--border);
@@ -150,7 +644,7 @@
   color: var(--foreground);
   background: var(--secondary);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -162,11 +656,225 @@
 
 .actions button:disabled {
   cursor: not-allowed;
-  opacity: 0.48;
+  opacity: 0.45;
+}
+
+.insightGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 12px 0;
+}
+
+.insightGrid article,
+.analysisGrid article,
+.promptInsightList article {
+  min-width: 0;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 16%);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--background), transparent 14%);
+}
+
+.insightGrid article {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.insightGrid span,
+.analysisHeader,
+.termCloud small,
+.promptInsightList span,
+.promptInsightList time,
+.promptInsightList small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.insightGrid strong {
+  color: var(--foreground);
+  font-size: 25px;
+  line-height: 1;
+}
+
+.insightGrid p {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.analysisGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px 12px 0;
+}
+
+.analysisGrid article {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 12px;
+}
+
+.analysisHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.analysisHeader strong {
+  color: var(--foreground);
+  font-size: 13px;
+}
+
+.analysisHeader svg {
+  color: var(--primary);
+}
+
+.rankList {
+  display: grid;
+  gap: 9px;
+}
+
+.rankList div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.rankList span {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rankList strong {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.rankList meter {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--secondary), transparent 14%);
+}
+
+.rankList meter::-webkit-meter-bar {
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--secondary), transparent 14%);
+}
+
+.rankList meter::-webkit-meter-optimum-value {
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.rankList meter::-moz-meter-bar {
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.insightList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.insightList li {
+  color: var(--foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.termCloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 10px 12px 0;
+}
+
+.termCloud span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: var(--radius);
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--secondary), transparent 12%);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.termCloud small {
+  color: var(--primary);
+}
+
+.termCloud p {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.promptInsightList {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px 0;
+}
+
+.promptInsightList article {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.promptInsightList article > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.promptInsightList strong {
+  color: var(--foreground);
+  font-size: 13px;
+}
+
+.promptInsightList small {
+  padding: 3px 6px;
+  border: 1px solid color-mix(in oklch, var(--warning), transparent 34%);
+  border-radius: var(--radius);
+  color: var(--warning-foreground);
+  background: color-mix(in oklch, var(--warning), transparent 76%);
+  font-weight: 800;
+}
+
+.promptInsightList p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .messageList {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   max-height: 620px;
   overflow: auto;
@@ -177,10 +885,11 @@
 .messageList article {
   display: grid;
   gap: 8px;
+  min-width: 0;
   padding: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in oklch, var(--border), transparent 16%);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.025);
+  background: color-mix(in oklch, var(--background), transparent 14%);
 }
 
 .messageList div {
@@ -203,27 +912,616 @@
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 860px) {
+.adminShell {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  min-height: 100dvh;
+  color: var(--foreground);
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 96%), transparent 280px),
+    color-mix(in oklch, var(--background), black 1%);
+}
+
+.sidebarToggleInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.adminShell:has(.sidebarToggleInput:checked) {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.adminSidebar {
+  position: sticky;
+  top: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  height: 100dvh;
+  min-width: 0;
+  overflow: hidden;
+  padding: 14px;
+  border-right: 1px solid color-mix(in oklch, var(--border), transparent 16%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 26%),
+    color-mix(in oklch, var(--sidebar), black 2%);
+}
+
+.sidebarBrand {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 20%);
+}
+
+.sidebarBrand > div {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 48%);
+  border-radius: 10px;
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.sidebarBrand span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sidebarBrand strong {
+  color: var(--foreground);
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.sidebarToggleButton {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: 9px;
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--card), transparent 10%);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.sidebarToggleButton:hover {
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--primary), transparent 58%);
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+}
+
+.sidebarToggleButton:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.sidebarBrand small,
+.navLink small,
+.patternCard small,
+.sidebarStatus span,
+.sidebarStatus p,
+.topbar p,
+.topbar span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.sideNav {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+}
+
+.navGroup {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.navGroup summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 28px;
+  padding: 0 4px;
+  color: color-mix(in oklch, var(--muted-foreground), white 8%);
+  font-size: 11px;
+  font-weight: 820;
+  line-height: 1.2;
+  list-style: none;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.navGroup summary::-webkit-details-marker {
+  display: none;
+}
+
+.navGroup summary::after {
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 160ms ease;
+  content: "";
+}
+
+.navGroup[open] summary::after {
+  transform: rotate(225deg) translateY(-1px);
+}
+
+.navGroup > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.navLink {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) minmax(34px, auto);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 50px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--muted-foreground);
+  background: transparent;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.navLink:hover {
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--primary), transparent 76%);
+  background: color-mix(in oklch, var(--primary), transparent 93%);
+}
+
+.navLink svg {
+  color: currentColor;
+}
+
+.navLink span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.navLink strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navLink small,
+.patternCard small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navLink b {
+  min-width: 28px;
+  max-width: 58px;
+  padding: 3px 6px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--background), transparent 10%);
+  font-size: 11px;
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navLinkActive {
+  color: var(--primary);
+  border-color: color-mix(in oklch, var(--primary), transparent 56%);
+  background:
+    linear-gradient(90deg, color-mix(in oklch, var(--primary), transparent 84%), transparent 80%),
+    color-mix(in oklch, var(--primary), transparent 93%);
+}
+
+.navLinkActive b {
+  color: var(--primary);
+  border-color: color-mix(in oklch, var(--primary), transparent 52%);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+}
+
+.sidebarStatus {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--card), transparent 12%);
+}
+
+.sidebarStatus strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.sidebarStatus p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.sidebarFooter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in oklch, var(--border), transparent 22%);
+}
+
+.sidebarFooter a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--card), transparent 8%);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sidebarFooter form,
+.sidebarFooter button {
+  width: 100%;
+}
+
+.adminShell:has(.sidebarToggleInput:checked) .adminSidebar {
+  justify-items: center;
+  padding: 14px 10px;
+}
+
+.adminShell:has(.sidebarToggleInput:checked) .sidebarBrand {
+  grid-template-columns: 38px;
+  justify-items: center;
+  gap: 8px;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.adminShell:has(.sidebarToggleInput:checked) .sidebarBrand span,
+.adminShell:has(.sidebarToggleInput:checked) .sideNav,
+.adminShell:has(.sidebarToggleInput:checked) .sidebarStatus,
+.adminShell:has(.sidebarToggleInput:checked) .sidebarFooter {
+  display: none;
+}
+
+.adminShell:has(.sidebarToggleInput:checked) .sidebarToggleButton {
+  width: 38px;
+  height: 38px;
+}
+
+.adminMain {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 100dvh;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+  padding: 18px 22px;
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent),
+    color-mix(in oklch, var(--background), black 1%);
+  backdrop-filter: blur(18px);
+}
+
+.topbar > div:first-child {
+  min-width: 0;
+}
+
+.topbar h1 {
+  margin: 3px 0 4px;
+  color: var(--foreground);
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.topbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.topbarActions span,
+.adminTabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 12%);
+  border-radius: var(--radius);
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--card), transparent 8%);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.adminTabs {
+  display: none;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 10px 14px;
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 20%);
+  scrollbar-width: none;
+}
+
+.adminTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.adminTabs a {
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+}
+
+.adminTabs a[aria-current="page"] {
+  color: var(--primary);
+  border-color: color-mix(in oklch, var(--primary), transparent 56%);
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+}
+
+.content {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  width: min(1480px, 100%);
+  min-width: 0;
+  padding: 18px 22px 30px;
+}
+
+.content .metrics,
+.content .statusGrid,
+.content .twoColumn,
+.content .panel {
+  width: 100%;
+  margin: 0;
+}
+
+.content .metrics,
+.content .statusGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.content .metricCard,
+.content .statusCell,
+.content .panel,
+.content .summaryGrid article {
+  box-shadow: none;
+}
+
+.content .panel {
+  border-color: color-mix(in oklch, var(--border), transparent 10%);
+}
+
+@media (max-width: 980px) {
   .admin {
     padding: 18px;
+  }
+
+  .adminShell {
+    grid-template-columns: 1fr;
+  }
+
+  .adminShell:has(.sidebarToggleInput:checked) {
+    grid-template-columns: 1fr;
+  }
+
+  .adminSidebar {
+    position: relative;
+    grid-template-rows: auto;
+    height: auto;
+    padding: 12px 14px;
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  }
+
+  .adminShell:has(.sidebarToggleInput:checked) .adminSidebar {
+    justify-items: stretch;
+    padding: 12px 14px;
+  }
+
+  .adminShell:has(.sidebarToggleInput:checked) .sidebarBrand {
+    grid-template-columns: 38px minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  .adminShell:has(.sidebarToggleInput:checked) .sidebarBrand span {
+    display: grid;
+  }
+
+  .sidebarToggleButton {
+    display: none;
+  }
+
+  .sideNav,
+  .sidebarStatus,
+  .sidebarFooter {
+    display: none;
+  }
+
+  .adminTabs {
+    display: flex;
+  }
+
+  .topbar {
+    position: relative;
+    display: grid;
+    padding: 16px 14px;
+  }
+
+  .topbarActions {
+    justify-content: flex-start;
+  }
+
+  .content {
+    padding: 14px;
   }
 
   .header {
     display: grid;
   }
 
-  .stats,
-  .grid {
+  .headerBadges {
+    justify-content: flex-start;
+  }
+
+  .metrics,
+  .statusGrid,
+  .twoColumn,
+  .patternGrid,
+  .insightGrid,
+  .analysisGrid,
+  .messageList {
     grid-template-columns: 1fr;
+  }
+
+  .content .metrics,
+  .content .statusGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panelHeader {
+    display: grid;
+  }
+
+  .panelHeader > span {
+    width: fit-content;
+  }
+
+  .summaryGrid,
+  .responseStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (min-width: 861px) and (max-width: 1180px) {
-  .stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+@media (min-width: 981px) and (max-width: 1180px) {
+  .metrics,
+  .statusGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .grid {
+  .content .metrics,
+  .content .statusGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .twoColumn {
     grid-template-columns: 1fr;
+  }
+
+  .patternGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .insightGrid,
+  .analysisGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .admin {
+    padding: 12px;
+  }
+
+  .sidebarBrand {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .topbar h1 {
+    font-size: 24px;
+  }
+
+  .topbarActions span {
+    max-width: 100%;
+  }
+
+  .content .metrics,
+  .content .statusGrid,
+  .insightGrid,
+  .analysisGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .metricCard {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+
+  .metricIcon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .summaryGrid,
+  .responseStats {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    min-width: 0;
   }
 }

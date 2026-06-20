@@ -22,7 +22,7 @@ export default function BillingCancelPage() {
             <Link className={styles.button} href="/billing">
               Back to billing
             </Link>
-            <Link className={styles.secondaryButton} href="/">
+            <Link className={styles.secondaryButton} href="/new">
               Return to chat
             </Link>
           </div>

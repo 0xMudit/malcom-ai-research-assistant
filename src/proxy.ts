@@ -1,12 +1,11 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-
-const adminUser =
-  process.env.MALCOM_ADMIN_USER ||
-  (process.env.NODE_ENV === "production" ? "" : "admin");
-const adminPassword =
-  process.env.MALCOM_ADMIN_PASSWORD ||
-  (process.env.NODE_ENV === "production" ? "" : "MalcomAdmin2026!");
+import {
+  adminSessionCookieName,
+  hasAdminCredentials,
+  isValidAdminAuthorization,
+  isValidAdminSession,
+} from "@/lib/admin-auth";
 
 function unauthorized() {
   return new NextResponse("Authentication required.", {
@@ -17,43 +16,54 @@ function unauthorized() {
   });
 }
 
+function isProtectedAdminPath(pathname: string) {
+  return (
+    pathname === "/api/auth/invite" ||
+    pathname === "/api/stats" ||
+    pathname === "/api/supabase/health"
+  );
+}
+
 export function proxy(request: NextRequest) {
-  if (!adminUser || !adminPassword) {
+  const pathname = request.nextUrl.pathname;
+  const response = NextResponse.next();
+
+  if (!pathname.startsWith("/api/") && request.method === "GET") {
+    response.headers.set(
+      "Cache-Control",
+      "no-store, max-age=0, must-revalidate",
+    );
+  }
+
+  if (!isProtectedAdminPath(pathname)) {
+    return response;
+  }
+
+  if (!hasAdminCredentials()) {
     return new NextResponse("Admin credentials are not configured.", {
       status: 503,
     });
   }
 
-  const header = request.headers.get("authorization");
+  const hasAuthorization = isValidAdminAuthorization(
+    request.headers.get("authorization"),
+  );
+  const hasSession = isValidAdminSession(
+    request.cookies.get(adminSessionCookieName)?.value,
+  );
 
-  if (!header?.startsWith("Basic ")) {
+  if (!hasAuthorization && !hasSession) {
     return unauthorized();
   }
 
-  let credentials = "";
-
-  try {
-    credentials = atob(header.slice(6));
-  } catch {
-    return unauthorized();
-  }
-
-  const separator = credentials.indexOf(":");
-
-  if (separator < 1) {
-    return unauthorized();
-  }
-
-  const user = credentials.slice(0, separator);
-  const password = credentials.slice(separator + 1);
-
-  if (user !== adminUser || password !== adminPassword) {
-    return unauthorized();
-  }
-
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
-  matcher: "/admin/:path*",
+  matcher: [
+    "/api/auth/invite",
+    "/api/stats",
+    "/api/supabase/health",
+    "/((?!api|_next/static|_next/image|favicon.ico|icon.svg|og-image.png|robots.txt|sitemap.xml).*)",
+  ],
 };

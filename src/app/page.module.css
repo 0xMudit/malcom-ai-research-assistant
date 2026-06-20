@@ -1,14 +1,16 @@
 .shell {
   position: relative;
   display: grid;
-  grid-template-columns: 304px minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
+  width: 100%;
+  max-width: 100dvw;
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
   color: var(--foreground);
   background:
-    radial-gradient(circle at 18% 0%, rgba(62, 207, 142, 0.09), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 34%),
+    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 95%), transparent 38%),
+    radial-gradient(circle at 18% 0%, color-mix(in oklch, var(--primary), transparent 91%), transparent 30%),
     var(--background);
   transition: grid-template-columns 220ms ease;
 }
@@ -18,14 +20,29 @@
 }
 
 .sidebar {
+  --nav-accent: var(--primary);
+  --nav-accent-foreground: var(--primary-foreground);
+  --nav-surface: var(--sidebar);
+  --nav-surface-raised: var(--card);
+  --nav-surface-soft: var(--popover);
+  --nav-muted: var(--muted-foreground);
+  --nav-border: var(--sidebar-border);
+  --nav-hover: color-mix(in oklch, var(--nav-surface-raised), white 5%);
+  --nav-active: color-mix(in oklch, var(--nav-accent), transparent 90%);
+
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   padding: 12px;
-  border-right: 1px solid var(--sidebar-border);
-  background: color-mix(in oklch, var(--sidebar), black 3%);
+  border-right: 1px solid color-mix(in oklch, var(--nav-border), transparent 16%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), transparent 24%),
+    linear-gradient(180deg, color-mix(in oklch, var(--nav-surface), var(--nav-accent) 3%), var(--nav-surface)),
+    var(--nav-surface);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.035);
+  font-family: var(--font-sans);
 }
 
 .sidebarHeader {
@@ -34,7 +51,7 @@
   align-items: center;
   gap: 8px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--sidebar-border);
+  border-bottom: 1px solid color-mix(in oklch, var(--nav-border), transparent 20%);
 }
 
 .brand {
@@ -43,11 +60,22 @@
   gap: 10px;
   min-width: 0;
   min-height: 42px;
-  border-radius: var(--radius);
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 12px;
   color: var(--foreground);
   background: transparent;
   text-align: left;
   cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.brand:hover {
+  border-color: color-mix(in oklch, var(--nav-accent), transparent 72%);
+  background: var(--nav-hover);
 }
 
 .brand span {
@@ -60,18 +88,25 @@
 
 .brand strong {
   color: var(--foreground);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 760;
   line-height: 1.15;
 }
 
 .brand small {
   overflow: hidden;
-  color: var(--muted-foreground);
-  font-size: 12px;
+  color: var(--nav-muted);
+  font-size: 11px;
+  font-weight: 560;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.brandDeveloper {
+  color: color-mix(in oklch, var(--primary), white 8%);
+  font-size: 10px;
+  font-weight: 720;
 }
 
 .malcomAvatar,
@@ -79,20 +114,39 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
 }
 
 .malcomAvatar {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid color-mix(in oklch, var(--primary), transparent 50%);
-  color: var(--primary);
+  color: var(--primary-foreground);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent),
-    color-mix(in oklch, var(--primary), transparent 91%);
+    linear-gradient(180deg, color-mix(in oklch, white, var(--primary) 38%), var(--primary));
+}
+
+.avatarBeta {
+  position: absolute;
+  top: -8px;
+  right: -18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 16px;
+  padding: 2px 5px;
+  border: 1px solid color-mix(in oklch, var(--primary), white 18%);
+  border-radius: 999px;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  font-size: 8px;
+  font-weight: 850;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
 }
 
 .avatarActive::after {
@@ -113,6 +167,7 @@
 .iconButton,
 .primaryButton,
 .secondaryButton,
+.upgradeButton,
 .workspacePanel button,
 .historyList button,
 .libraryGrid button,
@@ -120,12 +175,16 @@
 .documentRow button,
 .sessionEditor button,
 .sidebarFooter a,
+.settingsButton,
 .attachButton,
+.webResearchButton,
+.modeControl button,
 .sendButton,
 .limitCard button,
 .limitCard a,
 .heroActions button,
 .suggestions button,
+.promptActions button,
 .responseActions button,
 .responseComment button,
 .codeBlock button,
@@ -154,6 +213,7 @@
 .iconButton:focus-visible,
 .primaryButton:focus-visible,
 .secondaryButton:focus-visible,
+.upgradeButton:focus-visible,
 .workspacePanel button:focus-visible,
 .historyList button:focus-visible,
 .libraryGrid button:focus-visible,
@@ -161,16 +221,23 @@
 .documentRow button:focus-visible,
 .sessionEditor button:focus-visible,
 .sidebarFooter a:focus-visible,
+.settingsButton:focus-visible,
 .attachButton:focus-visible,
+.webResearchButton:focus-visible,
+.modeControl button:focus-visible,
 .sendButton:focus-visible,
 .limitCard button:focus-visible,
 .limitCard a:focus-visible,
 .heroActions button:focus-visible,
 .suggestions button:focus-visible,
+.promptActions button:focus-visible,
 .responseActions button:focus-visible,
 .responseComment button:focus-visible,
 .codeBlock button:focus-visible,
 .dialogHeader button:focus-visible,
+.upgradeHero button:focus-visible,
+.upgradePlan button:focus-visible,
+.upgradeSide button:focus-visible,
 .dialogForm button:focus-visible,
 .authSwitch a:focus-visible,
 .footerLinks a:focus-visible,
@@ -181,11 +248,18 @@
 
 .iconButton {
   width: 38px;
+  min-height: 38px;
   padding: 0;
-  color: var(--muted-foreground);
-  border-color: var(--border);
-  background: color-mix(in oklch, var(--secondary), transparent 22%);
+  color: var(--nav-muted);
+  border-color: transparent;
+  background: transparent;
   cursor: pointer;
+}
+
+.sidebar .iconButton:hover {
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--nav-accent), transparent 74%);
+  background: var(--nav-hover);
 }
 
 .iconButton:hover,
@@ -194,7 +268,10 @@
 .starredList button:hover,
 .documentRow button:hover,
 .sidebarFooter a:hover,
+.settingsButton:hover,
 .attachButton:hover:not(:disabled),
+.webResearchButton:hover:not(:disabled),
+.promptActions button:hover,
 .responseActions button:hover,
 .codeBlock button:hover,
 .dialogHeader button:hover,
@@ -210,19 +287,26 @@
 .sidebarActions {
   display: grid;
   gap: 8px;
-  padding: 12px 0;
+  padding: 12px 0 14px;
 }
 
 .primaryButton,
-.secondaryButton {
+.secondaryButton,
+.upgradeButton {
+  justify-content: start;
   width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 12px;
   cursor: pointer;
 }
 
 .primaryButton {
-  color: var(--primary-foreground);
-  background: var(--primary);
-  box-shadow: 0 12px 28px rgba(62, 207, 142, 0.16);
+  color: var(--nav-accent-foreground);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 70%),
+    var(--nav-accent);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--primary) 24%, transparent);
 }
 
 .primaryButton:hover,
@@ -233,31 +317,152 @@
   transform: translateY(-1px);
 }
 
+.sidebar .primaryButton:hover {
+  background: color-mix(in oklch, var(--nav-accent), white 7%);
+}
+
 .secondaryButton {
-  color: var(--primary);
-  border-color: color-mix(in oklch, var(--primary), transparent 62%);
-  background: color-mix(in oklch, var(--primary), transparent 92%);
+  color: var(--nav-muted);
+  border-color: color-mix(in oklch, var(--nav-border), transparent 22%);
+  background: color-mix(in oklch, var(--nav-surface-soft), transparent 18%);
+}
+
+.secondaryButton:hover {
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--nav-accent), transparent 68%);
+  background: var(--nav-hover);
+}
+
+.upgradeButton {
+  position: relative;
+  overflow: hidden;
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--nav-accent), transparent 44%);
+  background:
+    linear-gradient(135deg, color-mix(in oklch, var(--nav-accent), transparent 74%), transparent 68%),
+    color-mix(in oklch, var(--nav-surface-raised), var(--nav-accent) 9%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 24px rgba(0, 0, 0, 0.24);
+}
+
+.upgradeButton::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  opacity: 0;
+  transform: translateX(-70%);
+  transition:
+    opacity 160ms ease,
+    transform 320ms ease;
+  content: "";
+}
+
+.upgradeButton svg,
+.upgradeButton span {
+  position: relative;
+  z-index: 1;
+}
+
+.upgradeButton svg {
+  color: color-mix(in oklch, var(--nav-accent), white 18%);
+}
+
+.upgradeButton:hover {
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--nav-accent), transparent 24%);
+  background:
+    linear-gradient(135deg, color-mix(in oklch, var(--nav-accent), transparent 64%), transparent 70%),
+    color-mix(in oklch, var(--nav-surface-raised), var(--nav-accent) 14%);
+  transform: translateY(-1px);
+}
+
+.upgradeButton:hover::after {
+  opacity: 1;
+  transform: translateX(70%);
 }
 
 .sidebarScroll {
   display: grid;
   align-content: start;
-  gap: 14px;
+  gap: 16px;
   min-height: 0;
   overflow: hidden auto;
-  padding-right: 2px;
+  padding: 2px 4px 12px 0;
   scrollbar-width: thin;
+}
+
+.momentumPanel {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid color-mix(in oklch, var(--nav-accent), transparent 68%);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--nav-accent), transparent 82%), transparent 42%),
+    color-mix(in oklch, var(--nav-surface-raised), transparent 14%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.momentumPanel > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.momentumPanel span,
+.momentumPanel p {
+  color: var(--nav-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.momentumPanel strong {
+  flex: 0 0 auto;
+  color: color-mix(in oklch, var(--nav-accent), white 8%);
+  font-size: 13px;
+  font-weight: 780;
+  line-height: 1.2;
+}
+
+.momentumPanel p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.momentumTrack {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--nav-surface), white 7%);
+}
+
+.momentumTrack span {
+  display: block;
+  height: 100%;
+  max-width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--nav-accent), white 12%),
+    color-mix(in oklch, var(--nav-accent), white 28%)
+  );
 }
 
 .workspacePanel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in oklch, var(--card), transparent 10%);
+  border: 1px solid color-mix(in oklch, var(--nav-border), transparent 18%);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 72%),
+    color-mix(in oklch, var(--nav-surface-raised), transparent 16%);
 }
 
 .workspacePanel > div {
@@ -268,7 +473,7 @@
 
 .workspacePanel p,
 .sidebarStatus {
-  color: var(--muted-foreground);
+  color: var(--nav-muted);
   font-size: 12px;
   line-height: 1.35;
 }
@@ -283,20 +488,21 @@
   min-height: 32px;
   padding: 0 10px;
   color: var(--foreground);
-  border-color: var(--border);
-  background: var(--secondary);
+  border-color: color-mix(in oklch, var(--nav-border), transparent 18%);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--nav-surface), white 7%);
   cursor: pointer;
 }
 
 .planBadge {
   width: fit-content;
   max-width: 100%;
-  padding: 4px 8px;
+  padding: 3px 7px;
   overflow: hidden;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 52%);
+  border: 1px solid color-mix(in oklch, var(--nav-accent), transparent 42%);
   border-radius: 999px;
-  color: var(--primary);
-  background: color-mix(in oklch, var(--primary), transparent 91%);
+  color: color-mix(in oklch, var(--nav-accent), white 10%);
+  background: color-mix(in oklch, var(--nav-accent), transparent 88%);
   font-size: 11px;
   font-weight: 780;
   line-height: 1.1;
@@ -309,12 +515,12 @@
   grid-template-columns: 16px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  min-height: 38px;
-  padding: 0 10px;
-  border: 1px solid var(--input);
-  border-radius: var(--radius);
-  color: var(--muted-foreground);
-  background: color-mix(in oklch, var(--background), transparent 8%);
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in oklch, var(--nav-border), transparent 24%);
+  border-radius: 12px;
+  color: var(--nav-muted);
+  background: color-mix(in oklch, var(--nav-surface-soft), transparent 8%);
 }
 
 .historySearch input {
@@ -324,17 +530,18 @@
   color: var(--foreground);
   background: transparent;
   font-size: 13px;
+  font-weight: 540;
 }
 
 .historySearch:focus-within,
 .sessionEditor input:focus {
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring), transparent 82%);
+  border-color: color-mix(in oklch, var(--nav-accent), transparent 45%);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--nav-accent), transparent 82%);
 }
 
 .navSection {
   display: grid;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
 }
 
@@ -343,14 +550,15 @@
   align-items: center;
   gap: 8px;
   min-height: 26px;
-  color: var(--muted-foreground);
+  padding: 0 7px;
+  color: var(--nav-muted);
 }
 
 .navSectionHeader h2 {
-  color: var(--foreground);
+  color: color-mix(in oklch, var(--nav-muted), white 8%);
   font-size: 11px;
-  font-weight: 820;
-  letter-spacing: 0.08em;
+  font-weight: 760;
+  letter-spacing: 0;
   line-height: 1.2;
   text-transform: uppercase;
 }
@@ -358,7 +566,7 @@
 .historyList,
 .documentList {
   display: grid;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -366,22 +574,38 @@
 .documentRow {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 30px;
   align-items: stretch;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.sessionRow::before {
+  position: absolute;
+  inset: 8px auto 8px 0;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--nav-accent);
+  opacity: 0;
+  content: "";
 }
 
 .sessionOpenButton,
-.documentRow button:first-child {
+.documentRow > button {
   display: grid;
   justify-items: start;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
   width: 100%;
-  min-height: 42px;
-  padding: 8px 9px;
-  color: var(--muted-foreground);
+  min-height: 40px;
+  padding: 8px 10px 8px 12px;
+  color: var(--nav-muted);
   border-color: transparent;
   background: transparent;
   text-align: left;
@@ -393,8 +617,8 @@
   width: 100%;
   overflow: hidden;
   color: var(--foreground);
-  font-size: 12px;
-  font-weight: 660;
+  font-size: 13px;
+  font-weight: 620;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -402,9 +626,39 @@
 
 .sessionOpenButton time,
 .documentRow time {
-  color: var(--muted-foreground);
+  color: var(--nav-muted);
   font-size: 11px;
+  font-weight: 560;
   line-height: 1.2;
+}
+
+.sessionRow:hover,
+.documentRow:hover {
+  border-color: color-mix(in oklch, var(--nav-border), transparent 30%);
+  background: var(--nav-hover);
+}
+
+.sessionActive {
+  border-color: color-mix(in oklch, var(--nav-accent), transparent 58%);
+  background: var(--nav-active);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--nav-accent), transparent 78%);
+}
+
+.sessionActive::before {
+  opacity: 1;
+}
+
+.sessionActive .sessionOpenButton span {
+  color: var(--foreground);
+}
+
+.sessionActive .sessionOpenButton time {
+  color: color-mix(in oklch, var(--nav-accent), white 6%);
+}
+
+.sessionActive .sessionActions > button {
+  color: color-mix(in oklch, var(--nav-accent), white 10%);
+  opacity: 1;
 }
 
 .sessionActions {
@@ -415,20 +669,29 @@
 }
 
 .documentActions {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
 .sessionActions > button,
-.documentActions button {
+.documentActions > button {
   width: 30px;
-  min-height: 32px;
+  min-height: 36px;
   padding: 0;
-  color: var(--muted-foreground);
-  border-color: var(--border);
-  background: color-mix(in oklch, var(--secondary), transparent 18%);
+  color: var(--nav-muted);
+  border-color: transparent;
+  background: transparent;
   cursor: pointer;
+  opacity: 0.72;
+}
+
+.sessionRow:hover .sessionActions > button,
+.sessionRow:focus-within .sessionActions > button,
+.documentRow:hover .documentActions > button,
+.documentRow:focus-within .documentActions > button {
+  opacity: 1;
 }
 
 .sessionMenu {
@@ -440,9 +703,9 @@
   gap: 4px;
   width: 138px;
   padding: 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: color-mix(in oklch, var(--popover), black 4%);
+  border: 1px solid color-mix(in oklch, var(--nav-border), transparent 10%);
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--nav-surface-raised), black 5%);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
 }
 
@@ -459,14 +722,14 @@
 }
 
 .sessionMenu button:hover {
-  border-color: color-mix(in oklch, var(--primary), transparent 62%);
-  background: color-mix(in oklch, var(--primary), transparent 90%);
+  border-color: transparent;
+  background: color-mix(in oklch, var(--nav-accent), transparent 86%);
 }
 
 .libraryGrid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 6px;
+  gap: 3px;
 }
 
 .libraryGrid button {
@@ -474,11 +737,12 @@
   grid-template-columns: 16px minmax(0, 1fr) auto 14px;
   justify-content: stretch;
   width: 100%;
-  min-height: 36px;
+  min-height: 38px;
   padding: 0 10px;
-  color: var(--muted-foreground);
-  border-color: var(--border);
-  background: color-mix(in oklch, var(--secondary), transparent 24%);
+  color: var(--nav-muted);
+  border-color: transparent;
+  border-radius: 12px;
+  background: transparent;
   cursor: pointer;
 }
 
@@ -490,8 +754,8 @@
 
 .libraryGrid button[aria-expanded="true"] {
   color: var(--foreground);
-  border-color: color-mix(in oklch, var(--primary), transparent 56%);
-  background: color-mix(in oklch, var(--primary), transparent 90%);
+  border-color: color-mix(in oklch, var(--nav-accent), transparent 68%);
+  background: var(--nav-active);
 }
 
 .libraryGrid span {
@@ -499,13 +763,15 @@
   flex: 1;
   overflow: hidden;
   color: var(--foreground);
+  font-size: 13px;
+  font-weight: 620;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .libraryGrid strong {
   min-width: 18px;
-  color: var(--primary);
+  color: color-mix(in oklch, var(--nav-accent), white 8%);
   font-size: 12px;
   text-align: right;
 }
@@ -522,10 +788,10 @@
 .libraryPanel {
   display: grid;
   gap: 7px;
-  padding: 8px;
-  border: 1px solid color-mix(in oklch, var(--border), transparent 16%);
-  border-radius: var(--radius);
-  background: color-mix(in oklch, var(--background), transparent 8%);
+  padding: 6px;
+  border: 1px solid color-mix(in oklch, var(--nav-border), transparent 20%);
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--nav-surface-raised), transparent 18%);
   animation: panelIn 160ms ease both;
 }
 
@@ -543,7 +809,7 @@
   width: 100%;
   min-height: 38px;
   padding: 8px 9px;
-  color: var(--muted-foreground);
+  color: var(--nav-muted);
   border-color: transparent;
   background: transparent;
   text-align: left;
@@ -552,7 +818,7 @@
 
 .starredList button svg {
   margin-top: 1px;
-  color: var(--primary);
+  color: color-mix(in oklch, var(--nav-accent), white 6%);
 }
 
 .starredList span {
@@ -566,18 +832,18 @@
   white-space: nowrap;
 }
 
-.documentSelected button:first-child {
-  border-color: color-mix(in oklch, var(--primary), transparent 48%);
-  background: color-mix(in oklch, var(--primary), transparent 88%);
+.documentSelected > button {
+  border-color: color-mix(in oklch, var(--nav-accent), transparent 66%);
+  background: var(--nav-active);
 }
 
 .sessionEditor {
   display: grid;
   gap: 8px;
   padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: color-mix(in oklch, var(--card), transparent 10%);
+  border: 1px solid color-mix(in oklch, var(--nav-border), transparent 14%);
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--nav-surface-raised), transparent 14%);
 }
 
 .sessionEditor h2 {
@@ -589,12 +855,12 @@
 .sessionEditor input {
   width: 100%;
   min-height: 36px;
-  border: 1px solid var(--input);
-  border-radius: var(--radius);
+  border: 1px solid color-mix(in oklch, var(--nav-border), transparent 10%);
+  border-radius: 10px;
   outline: 0;
   padding: 0 10px;
   color: var(--foreground);
-  background: var(--background);
+  background: color-mix(in oklch, var(--nav-surface), black 4%);
   font-size: 13px;
 }
 
@@ -607,25 +873,42 @@
   min-height: 32px;
   padding: 0 10px;
   color: var(--foreground);
-  border-color: var(--border);
-  background: var(--secondary);
+  border-color: transparent;
+  background: color-mix(in oklch, var(--nav-surface), white 8%);
   cursor: pointer;
 }
 
 .sidebarFooter {
   display: grid;
-  gap: 7px;
+  gap: 8px;
   padding-top: 12px;
   margin-top: auto;
-  border-top: 1px solid var(--sidebar-border);
+  border-top: 1px solid color-mix(in oklch, var(--nav-border), transparent 18%);
 }
 
-.sidebarFooter a {
+.sidebarFooter a,
+.settingsButton {
   justify-content: start;
-  min-height: 36px;
+  min-height: 38px;
   padding: 0 10px;
-  color: var(--muted-foreground);
-  border-color: transparent;
+  color: var(--nav-muted);
+  border-color: color-mix(in oklch, var(--nav-border), transparent 24%);
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--nav-surface-soft), transparent 12%);
+}
+
+.sidebar .historyList button:hover,
+.sidebar .libraryGrid button:hover,
+.sidebar .starredList button:hover,
+.sidebar .documentRow > button:hover,
+.sidebar .documentActions > button:hover,
+.sidebarFooter a:hover,
+.settingsButton:hover,
+.workspacePanel button:hover,
+.sessionEditor button:hover {
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--nav-accent), transparent 70%);
+  background: var(--nav-hover);
 }
 
 .chat {
@@ -634,30 +917,125 @@
   min-height: 0;
   height: 100dvh;
   overflow: hidden;
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 96%), transparent 32%),
+    linear-gradient(180deg, color-mix(in oklch, var(--background), white 2%), var(--background) 62%);
+}
+
+.billingAlert {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  z-index: 8;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 10px;
+  width: min(620px, calc(100% - 36px));
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 12%);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), transparent 72%),
+    color-mix(in oklch, var(--popover), black 4%);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.38);
+  transform: translateX(-50%);
+}
+
+.billingAlert > div,
+.billingAlert button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.billingAlert > div {
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+}
+
+.billingAlert span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.billingAlert strong {
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.billingAlert p {
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.billingAlert button {
+  color: var(--muted-foreground);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+}
+
+.billingAlert button:hover {
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--border), transparent 18%);
+  background: color-mix(in oklch, var(--secondary), transparent 14%);
+}
+
+.billingAlertSuccess {
+  border-color: color-mix(in oklch, var(--primary), transparent 54%);
+}
+
+.billingAlertError {
+  border-color: color-mix(in oklch, var(--destructive), transparent 50%);
+}
+
+.billingAlertInfo {
+  border-color: color-mix(in oklch, var(--accent), transparent 44%);
 }
 
 .thread {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   height: 100%;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 34px clamp(16px, 6vw, 92px) 252px;
+  padding: 36px clamp(18px, 6vw, 104px) 136px;
   scrollbar-gutter: stable;
   scroll-behavior: smooth;
 }
 
 .emptyState {
   display: grid;
-  align-content: center;
+  align-content: end;
   justify-items: center;
-  width: min(660px, 100%);
-  min-height: min(480px, 58dvh);
+  gap: 16px;
+  width: min(860px, 100%);
+  min-height: min(520px, 64dvh);
   margin: 0 auto;
-  padding-top: clamp(18px, 6vh, 80px);
+  padding: clamp(40px, 11vh, 120px) 0 clamp(48px, 9vh, 96px);
   text-align: center;
+}
+
+.emptyState h1 {
+  max-width: 760px;
+  color: var(--foreground);
+  font-size: clamp(34px, 5vw, 56px);
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.08;
 }
 
 .heroKicker {
@@ -675,14 +1053,6 @@
   line-height: 1.2;
 }
 
-.emptyState h1 {
-  color: var(--foreground);
-  font-size: clamp(40px, 7vw, 72px);
-  font-weight: 780;
-  letter-spacing: 0;
-  line-height: 1;
-}
-
 .heroLead {
   width: min(560px, 100%);
   color: var(--foreground);
@@ -694,22 +1064,89 @@
 
 .welcomeLine {
   width: fit-content;
-  max-width: min(620px, 100%);
+  max-width: min(640px, 100%);
   min-height: 0;
-  padding: 10px 14px;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
-  border-radius: 999px;
-  color: var(--foreground);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent),
-    color-mix(in oklch, var(--card), transparent 18%);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.2);
-  font-size: clamp(15px, 2vw, 19px);
-  font-weight: 650;
+  padding: 0;
+  border: 0;
+  color: color-mix(in oklch, var(--muted-foreground), white 7%);
+  background: transparent;
+  box-shadow: none;
+  font-size: clamp(15px, 1.7vw, 18px);
+  font-weight: 480;
   letter-spacing: 0;
   line-height: 1.35;
   animation: welcomeLineIn 520ms ease both;
+}
+
+.emptyValueRail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  width: min(620px, 100%);
+  padding: 12px 13px 12px 15px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 64%),
+    linear-gradient(135deg, color-mix(in oklch, var(--primary), transparent 94%), transparent 58%),
+    color-mix(in oklch, var(--card), transparent 8%);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  text-align: left;
   backdrop-filter: blur(18px);
+}
+
+.emptyValueRail > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.emptyValueRail span {
+  color: color-mix(in oklch, var(--primary), white 8%);
+  font-size: 12px;
+  font-weight: 780;
+  line-height: 1.2;
+}
+
+.emptyValueRail strong {
+  color: var(--foreground);
+  font-size: 15px;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.emptyValueRail p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.emptyValueRail button {
+  min-height: 36px;
+  padding: 0 12px;
+  color: var(--primary-foreground);
+  border-color: transparent;
+  border-radius: 999px;
+  background: var(--primary);
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.emptyValueRail button span {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.emptyValueRail button:hover {
+  background: color-mix(in oklch, var(--primary), white 7%);
+  transform: translateY(-1px);
 }
 
 .heroSubcopy {
@@ -820,10 +1257,10 @@
 .message {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
-  gap: 13px;
-  width: min(900px, 100%);
+  gap: 14px;
+  width: min(780px, 100%);
   margin: 0 auto;
-  padding: 18px 0;
+  padding: 16px 0;
 }
 
 .messageEntered {
@@ -843,15 +1280,15 @@
   grid-row: 1;
   justify-self: end;
   width: fit-content;
-  max-width: min(720px, 100%);
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in oklch, var(--accent), transparent 20%);
+  max-width: min(600px, 100%);
+  padding: 12px 15px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
+  border-radius: 18px;
+  background: color-mix(in oklch, var(--primary), transparent 88%);
 }
 
 .assistant .messageBody {
-  padding-top: 4px;
+  padding-top: 3px;
 }
 
 .messageBody {
@@ -860,10 +1297,10 @@
 
 .messageBody > span {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 7px;
   color: var(--muted-foreground);
-  font-size: 13px;
-  font-weight: 690;
+  font-size: 12px;
+  font-weight: 610;
   line-height: 1.3;
 }
 
@@ -871,6 +1308,37 @@
   display: grid;
   gap: 12px;
   min-width: 0;
+}
+
+.promptTools {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.promptActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.promptActions button {
+  width: 30px;
+  min-height: 28px;
+  padding: 0;
+  color: var(--muted-foreground);
+  border-color: color-mix(in oklch, var(--primary), transparent 68%);
+  background: color-mix(in oklch, var(--background), transparent 42%);
+  cursor: pointer;
+}
+
+.promptStatus {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: right;
 }
 
 .messageContent h1,
@@ -907,7 +1375,7 @@
 .messageContent li {
   color: var(--foreground);
   font-size: 15px;
-  line-height: 1.74;
+  line-height: 1.72;
   overflow-wrap: break-word;
 }
 
@@ -938,7 +1406,7 @@
   gap: 8px;
   padding: 10px 12px;
   border-left: 3px solid var(--primary);
-  border-radius: var(--radius);
+  border-radius: 12px;
   color: var(--muted-foreground);
   background: color-mix(in oklch, var(--primary), transparent 92%);
 }
@@ -946,10 +1414,10 @@
 .messageContent p code,
 .messageContent li code {
   padding: 2px 5px;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 76%);
   border-radius: 6px;
   color: var(--foreground);
-  background: var(--secondary);
+  background: color-mix(in oklch, var(--primary), transparent 91%);
   font-family: var(--font-mono);
   font-size: 0.92em;
   white-space: normal;
@@ -968,9 +1436,9 @@
   padding: 14px 16px;
   overflow-x: auto;
   overflow-y: hidden;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 74%);
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--card), transparent 26%);
 }
 
 .messageContent :global(.katex-display > .katex) {
@@ -983,9 +1451,9 @@
   width: 100%;
   min-width: 0;
   overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: color-mix(in oklch, var(--card), transparent 3%);
+  border: 1px solid color-mix(in oklch, var(--border), transparent 10%);
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--card), transparent 8%);
 }
 
 .tableScroll table {
@@ -1024,9 +1492,9 @@
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--code);
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 78%);
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--code), var(--primary) 4%);
 }
 
 .codeBlock figcaption {
@@ -1060,6 +1528,163 @@
   font-size: 13px;
   line-height: 1.65;
   white-space: pre;
+}
+
+.diagramBlock {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 70%);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    color-mix(in oklch, var(--card), black 2%);
+}
+
+.diagramBlock figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 10px 0 12px;
+  border-bottom: 1px solid color-mix(in oklch, var(--primary), transparent 78%);
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.diagramBlock button {
+  min-height: 28px;
+  padding: 0 8px;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+}
+
+.diagramCanvas {
+  width: 100%;
+  min-height: 180px;
+  overflow: auto;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in oklch, var(--primary), transparent 90%), transparent 44%),
+    color-mix(in oklch, var(--background), white 1%);
+}
+
+.diagramCanvas svg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 520px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.diagramFallback {
+  overflow: auto;
+  padding: 18px;
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 94%), transparent),
+    color-mix(in oklch, var(--background), white 1%);
+}
+
+.diagramFallbackFlow {
+  display: grid;
+  gap: 10px;
+  min-width: 520px;
+}
+
+.diagramFallbackEdge {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto minmax(160px, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.diagramFallbackEdge > span:not(.diagramFallbackArrow),
+.diagramNodeGrid span {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 62%);
+  border-radius: 8px;
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--card), black 2%);
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.diagramFallbackArrow {
+  position: relative;
+  min-width: 90px;
+  padding: 0 18px;
+  color: color-mix(in oklch, var(--primary), white 10%);
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.diagramFallbackArrow::before,
+.diagramFallbackArrow::after {
+  position: absolute;
+  top: 50%;
+  content: "";
+}
+
+.diagramFallbackArrow::before {
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: color-mix(in oklch, var(--primary), transparent 30%);
+  transform: translateY(-50%);
+}
+
+.diagramFallbackArrow::after {
+  right: 0;
+  width: 7px;
+  height: 7px;
+  border-top: 1px solid color-mix(in oklch, var(--primary), transparent 18%);
+  border-right: 1px solid color-mix(in oklch, var(--primary), transparent 18%);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.diagramFallbackArrow {
+  isolation: isolate;
+}
+
+.diagramFallbackArrow {
+  background: color-mix(in oklch, var(--background), white 1%);
+}
+
+.diagramNodeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  min-width: 360px;
+}
+
+.diagramUnavailable {
+  padding: 18px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.diagramError,
+.diagramLoading {
+  padding: 16px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.diagramError pre {
+  margin-top: 10px;
+  overflow-x: auto;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
 .responseTools {
@@ -1130,75 +1755,174 @@
   line-height: 1.35;
 }
 
-.thinking {
-  display: grid;
-  gap: 9px;
-  width: min(410px, 100%);
-  min-height: 138px;
-  padding: 14px;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
-  border-radius: var(--radius-lg);
-  color: var(--foreground);
-  background:
-    linear-gradient(135deg, color-mix(in oklch, var(--primary), transparent 90%), rgba(255, 255, 255, 0.025)),
-    var(--card);
+.streamingMessage .messageBody {
+  animation: messageEntered 180ms ease both;
 }
 
-.thinking strong {
+.streamingStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  margin-top: 4px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 70%);
+  border-radius: 999px;
+  color: color-mix(in oklch, var(--muted-foreground), white 8%);
+  background: color-mix(in oklch, var(--primary), transparent 92%);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.streamingStatus span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 12px color-mix(in oklch, var(--primary), transparent 42%);
+  animation: thinkingPulse 1s ease-in-out infinite;
+}
+
+.thinking {
+  display: grid;
+  gap: 11px;
+  width: min(520px, 100%);
+  min-height: 168px;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 70%);
+  border-radius: 16px;
   color: var(--foreground);
-  font-size: 13px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--primary), transparent 84%), transparent 42%),
+    linear-gradient(135deg, color-mix(in oklch, var(--primary), transparent 91%), rgba(255, 255, 255, 0.02)),
+    color-mix(in oklch, var(--card), transparent 10%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.thinkingHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.thinkingHeader strong {
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.thinkingHeader span {
+  flex: 0 0 auto;
+  min-width: 34px;
+  padding: 4px 7px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 68%);
+  border-radius: 999px;
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary), transparent 92%);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1;
 }
 
 .thinking p {
   color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.45;
-  min-height: 38px;
+  min-height: 36px;
 }
 
-.progressTrack {
+.thinkingRail {
   position: relative;
-  width: 100%;
   height: 7px;
   overflow: hidden;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 68%);
   border-radius: 999px;
-  background: color-mix(in oklch, var(--primary), transparent 90%);
+  background: color-mix(in oklch, var(--background), white 7%);
 }
 
-.progressTrack span {
+.thinkingRail span {
   position: absolute;
-  inset: 1px auto 1px 1px;
-  width: 42%;
+  inset: 0 auto 0 0;
+  width: 44%;
   border-radius: inherit;
   background: linear-gradient(
     90deg,
+    transparent,
     color-mix(in oklch, var(--primary), white 12%),
-    var(--primary)
+    transparent
   );
-  box-shadow: 0 0 14px color-mix(in oklch, var(--primary), transparent 46%);
-  animation: progressSweep 1.35s ease-in-out infinite;
+  animation: thinkingScan 1.35s ease-in-out infinite;
+}
+
+.thinkingSteps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.thinkingSteps span {
+  min-width: 0;
+  padding: 6px 5px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 32%);
+  border-radius: 9px;
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--background), transparent 12%);
+  font-size: 11px;
+  font-weight: 680;
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thinkingSteps span[data-active="true"] {
+  color: color-mix(in oklch, var(--primary), white 12%);
+  border-color: color-mix(in oklch, var(--primary), transparent 54%);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+}
+
+.thinkingActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.thinkingActions button {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 68%);
+  border-radius: 999px;
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--primary), transparent 91%);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.thinkingActions button:hover {
+  border-color: color-mix(in oklch, var(--primary), transparent 48%);
+  background: color-mix(in oklch, var(--primary), transparent 86%);
 }
 
 .composerWrap {
   position: absolute;
   right: 0;
-  bottom: 12px;
+  bottom: 10px;
   left: 0;
   z-index: 5;
   display: grid;
   justify-items: center;
-  padding: 0 clamp(14px, 5vw, 92px);
+  padding: 0 clamp(12px, 4vw, 72px);
   pointer-events: none;
 }
 
 .limitCard,
-.attachmentStrip,
 .error,
 .documentStatus,
-.composer,
-.composerMeta {
-  width: min(900px, 100%);
+.composer {
+  width: min(1040px, 100%);
   pointer-events: auto;
 }
 
@@ -1210,7 +1934,7 @@
   margin-bottom: 10px;
   padding: 12px;
   border: 1px solid color-mix(in oklch, var(--destructive), transparent 48%);
-  border-radius: var(--radius-lg);
+  border-radius: 16px;
   color: var(--foreground);
   background: color-mix(in oklch, var(--destructive), transparent 86%);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
@@ -1250,38 +1974,57 @@
 
 .attachmentStrip {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
+  flex-wrap: nowrap;
+  gap: 4px;
+  width: 100%;
+  overflow-x: auto;
+  padding: 0 4px 1px;
+  margin: -2px 0 0;
+  scrollbar-width: none;
+}
+
+.attachmentStrip::-webkit-scrollbar {
+  display: none;
 }
 
 .attachmentStrip button {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  max-width: min(360px, 100%);
-  min-height: 34px;
-  padding: 0 9px;
+  gap: 4px;
+  max-width: min(260px, 72%);
+  min-height: 22px;
+  padding: 0 6px;
   overflow: hidden;
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 50%);
-  border-radius: var(--radius);
-  color: var(--primary);
-  background: color-mix(in oklch, var(--primary), transparent 89%);
-  font-size: 12px;
-  font-weight: 720;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 68%);
+  border-radius: 999px;
+  color: color-mix(in oklch, var(--primary), white 4%);
+  background: color-mix(in oklch, var(--primary), transparent 94%);
+  font-size: 11px;
+  font-weight: 680;
   cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.attachmentStrip button:hover {
+  border-color: color-mix(in oklch, var(--primary), transparent 48%);
+  background: color-mix(in oklch, var(--primary), transparent 89%);
 }
 
 .attachmentStrip span {
   min-width: 0;
   overflow: hidden;
+  max-width: 190px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .attachmentStrip small {
-  color: var(--muted-foreground);
-  font-size: 11px;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .error,
@@ -1291,7 +2034,7 @@
   gap: 8px;
   margin-bottom: 10px;
   padding: 10px 12px;
-  border-radius: var(--radius);
+  border-radius: 14px;
   font-size: 13px;
   line-height: 1.45;
 }
@@ -1303,9 +2046,14 @@
 }
 
 .documentStatus {
-  border: 1px solid color-mix(in oklch, var(--primary), transparent 66%);
+  width: auto;
+  margin: -1px 4px 0;
+  padding: 4px 7px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
   color: var(--muted-foreground);
   background: color-mix(in oklch, var(--primary), transparent 92%);
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .fileInput {
@@ -1314,17 +2062,17 @@
 
 .composer {
   display: grid;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid color-mix(in oklch, var(--input), transparent 12%);
-  border-radius: 18px;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 76%);
+  border-radius: 10px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 58%),
-    color-mix(in oklch, var(--card), black 2%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.025)),
+    color-mix(in oklch, var(--card), transparent 2%);
   box-shadow:
-    0 26px 80px rgba(0, 0, 0, 0.46),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(18px);
+    0 28px 82px rgba(0, 0, 0, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(24px) saturate(1.25);
 }
 
 .composer:focus-within,
@@ -1341,20 +2089,111 @@
     color-mix(in oklch, var(--card), black 1%);
 }
 
+.composerThinking {
+  border-color: color-mix(in oklch, var(--primary), transparent 54%);
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--primary), transparent 88%),
+    0 28px 82px rgba(0, 0, 0, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
 .composerTop textarea {
   width: 100%;
-  min-height: 64px;
-  max-height: 220px;
-  resize: vertical;
+  min-height: 34px;
+  max-height: 92px;
+  resize: none;
   border: 0;
   outline: 0;
-  padding: 8px 6px;
+  padding: 4px 7px 2px;
   color: var(--foreground);
   background: transparent;
   font: inherit;
   font-size: 15px;
-  line-height: 1.55;
+  line-height: 1.45;
   scrollbar-width: thin;
+}
+
+.promptStarterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 4px;
+}
+
+.promptStarterRow button {
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
+  border-radius: 999px;
+  color: color-mix(in oklch, var(--muted-foreground), white 8%);
+  background: color-mix(in oklch, var(--primary), transparent 93%);
+  font-size: 12px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.promptStarterRow button:hover:not(:disabled) {
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--primary), transparent 52%);
+  background: color-mix(in oklch, var(--primary), transparent 87%);
+  transform: translateY(-1px);
+}
+
+.promptStarterRow button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.promptSignal {
+  display: grid;
+  grid-template-columns: auto minmax(58px, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 6px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.promptSignal > div {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--background), white 7%);
+}
+
+.promptSignal > div span {
+  display: block;
+  height: 100%;
+  max-width: 100%;
+  border-radius: inherit;
+  background: color-mix(in oklch, var(--muted-foreground), transparent 34%);
+  transition:
+    width 180ms ease,
+    background 180ms ease;
+}
+
+.promptSignal[data-tone="good"] > div span {
+  background: color-mix(in oklch, var(--primary), white 4%);
+}
+
+.promptSignal[data-tone="strong"] {
+  color: color-mix(in oklch, var(--primary), white 10%);
+}
+
+.promptSignal[data-tone="strong"] > div span {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--primary), white 6%),
+    color-mix(in oklch, var(--primary), white 22%)
+  );
+}
+
+.promptSignal strong {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 720;
+  white-space: nowrap;
 }
 
 .composerTop textarea::placeholder {
@@ -1368,62 +2207,114 @@
 
 .composerBottom {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
-.composerBottom p,
-.shortcutHint,
-.composerMeta {
-  color: var(--muted-foreground);
-  font-size: 12px;
-  line-height: 1.35;
+.composerTools {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
 }
 
-.composerBottom p {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.shortcutHint {
-  white-space: nowrap;
-}
-
-.attachButton {
-  min-height: 36px;
-  padding: 0 11px;
+.attachButton,
+.webResearchButton {
+  min-height: 30px;
+  padding: 0 10px;
   color: var(--foreground);
-  border-color: var(--border);
-  background: var(--secondary);
+  border-color: color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--secondary), transparent 14%);
   cursor: pointer;
 }
 
+.webResearchButton {
+  color: color-mix(in oklch, var(--muted-foreground), white 8%);
+}
+
+.webResearchButton[aria-pressed="true"] {
+  color: color-mix(in oklch, var(--primary), white 8%);
+  border-color: color-mix(in oklch, var(--primary), transparent 48%);
+  background: color-mix(in oklch, var(--primary), transparent 86%);
+}
+
+.modeControl {
+  display: grid;
+  justify-self: start;
+  grid-template-columns: repeat(3, minmax(68px, auto));
+  gap: 3px;
+  min-width: 0;
+  padding: 2px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 20%);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--background), transparent 12%);
+}
+
+.modeControl button {
+  min-height: 26px;
+  padding: 0 7px;
+  color: var(--muted-foreground);
+  border-color: transparent;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.modeControl button[aria-pressed="true"] {
+  color: var(--foreground);
+  border-color: transparent;
+  background: color-mix(in oklch, var(--primary), transparent 82%);
+}
+
+.modeControl button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 .sendButton {
-  min-height: 40px;
-  padding: 0 13px;
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 999px;
   color: var(--primary-foreground);
   background: var(--primary);
   cursor: pointer;
 }
 
+.stopButton {
+  color: var(--destructive-foreground);
+  border-color: color-mix(in oklch, var(--destructive), transparent 35%);
+  background: var(--destructive);
+}
+
+.stopButton:hover {
+  filter: brightness(1.06);
+}
+
+.sendButton span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .sendButton:disabled,
 .attachButton:disabled,
+.webResearchButton:disabled,
+.modeControl button:disabled,
+.upgradePlan button:disabled,
+.upgradeSide button:disabled,
 .dialogForm button:disabled {
   cursor: not-allowed;
   color: var(--muted-foreground);
   border-color: var(--border);
   background: var(--secondary);
   box-shadow: none;
-}
-
-.composerMeta {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 8px;
 }
 
 .dialogBackdrop {
@@ -1433,8 +2324,10 @@
   display: grid;
   place-items: center;
   padding: 18px;
-  background: rgba(2, 8, 11, 0.76);
-  backdrop-filter: blur(14px);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary) 12%, transparent), transparent),
+    rgba(7, 8, 11, 0.82);
+  backdrop-filter: blur(18px) saturate(1.2);
 }
 
 .dialog {
@@ -1442,9 +2335,750 @@
   max-height: calc(100dvh - 36px);
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 10px;
   background: color-mix(in oklch, var(--popover), black 4%);
   box-shadow: var(--shadow);
+}
+
+.settingsDialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(980px, calc(100vw - 32px));
+  max-height: calc(100dvh - 36px);
+  overflow: hidden;
+  border-color: color-mix(in oklch, var(--border), transparent 8%);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.065), transparent 180px),
+    color-mix(in oklch, var(--popover), black 7%);
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.58),
+    inset 0 1px 0 rgba(255, 255, 255, 0.075);
+}
+
+.settingsHeader {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 68px;
+  padding: 14px 18px;
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 12%);
+  background: color-mix(in oklch, var(--background), transparent 26%);
+}
+
+.settingsTitle {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.settingsHeader p,
+.settingsSection p,
+.settingsField span,
+.settingsFormField span,
+.settingsGrid span,
+.settingsPlanCard span,
+.settingsStatus {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.settingsHeader p,
+.settingsSection p,
+.settingsPlanCard p,
+.settingsNotice p {
+  margin: 0;
+}
+
+.settingsHeader h2 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.settingsHeader button {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  color: var(--muted-foreground);
+  border-color: color-mix(in oklch, var(--border), transparent 16%);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--secondary), transparent 22%);
+  cursor: pointer;
+}
+
+.settingsShell {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  height: min(650px, calc(100dvh - 105px));
+  overflow: hidden;
+}
+
+.settingsNav {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px;
+  border-right: 1px solid color-mix(in oklch, var(--border), transparent 14%);
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--primary), transparent 94%), transparent 180px),
+    color-mix(in oklch, var(--background), black 3%);
+  scrollbar-width: thin;
+}
+
+.settingsNav button {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  justify-content: start;
+  min-height: 40px;
+  padding: 0 11px;
+  color: var(--muted-foreground);
+  border-color: transparent;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.settingsNav button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingsNav button:hover,
+.settingsNavActive {
+  color: var(--foreground) !important;
+  border-color: color-mix(in oklch, var(--primary), transparent 76%) !important;
+  background: color-mix(in oklch, var(--primary), transparent 89%) !important;
+}
+
+.settingsNavActive svg {
+  color: var(--primary);
+}
+
+.settingsPanel {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 22px 24px;
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--card), transparent 82%), transparent 160px),
+    color-mix(in oklch, var(--background), transparent 8%);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.settingsInsightPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  max-width: none;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 72%);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--primary), transparent 84%), transparent 42%),
+    color-mix(in oklch, var(--card), transparent 10%);
+}
+
+.settingsInsightPanel > div:first-child {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.settingsInsightPanel span,
+.settingsInsightPanel p {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.settingsInsightPanel strong {
+  color: var(--foreground);
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.settingsInsightGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(62px, 1fr));
+  gap: 6px;
+}
+
+.settingsInsightGrid span {
+  min-height: 28px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 26%);
+  border-radius: 9px;
+  background: color-mix(in oklch, var(--background), transparent 10%);
+  text-align: center;
+}
+
+.settingsInsightGrid span[data-active="true"] {
+  color: color-mix(in oklch, var(--primary), white 10%);
+  border-color: color-mix(in oklch, var(--primary), transparent 54%);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+}
+
+.settingsSection {
+  display: grid;
+  gap: 14px;
+  max-width: none;
+  padding: 18px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 70%),
+    color-mix(in oklch, var(--card), transparent 7%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.settingsSection h3 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 21px;
+  line-height: 1.25;
+}
+
+.settingsSection > div:first-child {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 26%);
+}
+
+.settingsPlanCard,
+.settingsNotice {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 70%);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--primary), transparent 88%), transparent 48%),
+    color-mix(in oklch, var(--background), transparent 8%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.gfMemoPanel {
+  display: grid;
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid color-mix(in oklch, var(--accent), transparent 50%);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, color-mix(in oklch, var(--accent), transparent 85%), transparent 58%),
+    color-mix(in oklch, var(--background), transparent 8%);
+}
+
+.gfMemoPanel > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.gfMemoPanel span,
+.gfMemoPanel p,
+.gfMemoPanel li {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.gfMemoPanel strong {
+  color: var(--foreground);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.gfMemoPanel ul {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
+  margin: 0;
+}
+
+.gfMemoChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.gfMemoChips span {
+  min-height: 28px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in oklch, var(--accent), transparent 52%);
+  border-radius: 999px;
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--accent), transparent 82%);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.settingsField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 56px;
+  padding: 12px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 28%);
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--background), transparent 12%);
+}
+
+.settingsField:last-child {
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 28%);
+}
+
+.settingsField strong,
+.settingsPlanCard strong,
+.settingsGrid strong,
+.settingsNotice strong {
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.settingsField strong {
+  justify-self: end;
+  max-width: 280px;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingsSegment {
+  display: inline-grid;
+  grid-template-columns: repeat(3, minmax(74px, auto));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 16%);
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--background), black 2%);
+}
+
+.settingsSegment button {
+  min-height: 30px;
+  padding: 0 10px;
+  color: var(--muted-foreground);
+  border-color: transparent;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settingsSegment button[aria-pressed="true"] {
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--primary), transparent 84%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary), transparent 72%);
+}
+
+.settingsFormField {
+  display: grid;
+  gap: 8px;
+}
+
+.settingsFormField input,
+.settingsFormField textarea {
+  width: 100%;
+  border: 1px solid color-mix(in oklch, var(--input), transparent 8%);
+  border-radius: 12px;
+  outline: 0;
+  padding: 12px 13px;
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--background), black 3%);
+  line-height: 1.45;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.settingsFormField textarea {
+  min-height: 160px;
+  resize: vertical;
+}
+
+.settingsFormField input:focus,
+.settingsFormField textarea:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring), transparent 78%);
+}
+
+.settingsActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding-top: 2px;
+}
+
+.settingsActions button {
+  min-height: 38px;
+  padding: 0 13px;
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--border), transparent 16%);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--secondary), transparent 12%);
+  cursor: pointer;
+}
+
+.settingsActions button:first-child {
+  color: var(--primary-foreground);
+  border-color: transparent;
+  background: var(--primary);
+}
+
+.settingsActions button:disabled {
+  cursor: not-allowed;
+  color: var(--muted-foreground);
+  border-color: var(--border);
+  background: var(--secondary);
+}
+
+.settingsDangerButton:not(:disabled) {
+  color: var(--destructive-foreground) !important;
+  border-color: color-mix(in oklch, var(--destructive), transparent 38%) !important;
+  background: color-mix(in oklch, var(--destructive), transparent 72%) !important;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settingsGrid div {
+  display: grid;
+  gap: 6px;
+  min-height: 84px;
+  padding: 13px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--background), black 1%);
+}
+
+.settingsPlanCard strong {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.settingsPlanCard p:last-child {
+  color: color-mix(in oklch, var(--foreground), transparent 14%);
+  font-weight: 640;
+}
+
+.settingsNotice {
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: start;
+}
+
+.settingsNotice svg {
+  color: var(--primary);
+}
+
+.settingsStatus {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 64%);
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+}
+
+.upgradeDialog {
+  width: min(940px, calc(100vw - 32px));
+  overflow: hidden;
+  border-color: color-mix(in oklch, var(--primary), transparent 62%);
+  background:
+    radial-gradient(circle at 85% 0%, color-mix(in oklch, var(--primary), transparent 78%), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 220px),
+    color-mix(in oklch, var(--popover), black 6%);
+}
+
+.upgradeHero {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 36px;
+  align-items: start;
+  gap: 13px;
+  padding: 18px;
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 16%);
+}
+
+.upgradeHero p,
+.upgradeHero span,
+.upgradePlanHeader span,
+.upgradePlanHeader p,
+.upgradeMetric span,
+.upgradeMetric p,
+.upgradeStatus {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.upgradeHero p,
+.upgradeHero h2,
+.upgradeHero span,
+.upgradePlanHeader p,
+.upgradeMetric p {
+  margin: 0;
+}
+
+.upgradeHero p {
+  color: color-mix(in oklch, var(--primary), white 8%);
+  font-weight: 780;
+}
+
+.upgradeHero h2 {
+  margin-top: 3px;
+  color: var(--foreground);
+  font-size: 26px;
+  line-height: 1.05;
+}
+
+.upgradeHero > button {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  color: var(--muted-foreground);
+  border-color: color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--secondary), transparent 20%);
+  cursor: pointer;
+}
+
+.upgradeIcon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 50%);
+  border-radius: 14px;
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary), transparent 86%);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.upgradeBody {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.upgradePlanGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.upgradePlan,
+.upgradeMetric {
+  border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--card), transparent 8%);
+}
+
+.upgradePlan {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 14px;
+  padding: 15px;
+}
+
+.upgradePlanPrimary {
+  border-color: color-mix(in oklch, var(--primary), transparent 56%);
+  background:
+    linear-gradient(135deg, color-mix(in oklch, var(--primary), transparent 88%), transparent 62%),
+    color-mix(in oklch, var(--card), transparent 6%);
+}
+
+.upgradePlanHeader {
+  display: grid;
+  gap: 5px;
+}
+
+.upgradePriceRow {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.upgradePlanHeader span {
+  width: fit-content;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 54%);
+  border-radius: 999px;
+  color: color-mix(in oklch, var(--primary), white 8%);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+  font-weight: 780;
+}
+
+.upgradePlanHeader strong {
+  color: var(--foreground);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.upgradePriceRow p {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 1;
+}
+
+.upgradePriceRow b {
+  color: var(--foreground);
+  font-size: 25px;
+}
+
+.upgradePlan ul {
+  display: grid;
+  gap: 9px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.upgradePlan li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.upgradePlan li svg {
+  color: var(--primary);
+}
+
+.upgradePrimaryCta,
+.upgradeSecondaryCta,
+.upgradeTextButton {
+  cursor: pointer;
+}
+
+.upgradePrimaryCta {
+  min-height: 44px;
+  padding: 0 14px;
+  border-color: transparent;
+  border-radius: 12px;
+  color: var(--primary-foreground);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 70%),
+    var(--primary);
+  font-weight: 780;
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.upgradePrimaryCta:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--primary), white 8%);
+  transform: translateY(-1px);
+}
+
+.upgradeComparison {
+  display: grid;
+  gap: 12px;
+}
+
+.upgradeMetric {
+  display: grid;
+  gap: 6px;
+  padding: 13px;
+}
+
+.upgradeMetric strong {
+  color: var(--foreground);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.upgradeSecondaryCta,
+.upgradeTextButton {
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 11px;
+  font-weight: 740;
+}
+
+.upgradeSecondaryCta {
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--border), transparent 12%);
+  background: color-mix(in oklch, var(--secondary), transparent 12%);
+}
+
+.upgradeTextButton {
+  color: color-mix(in oklch, var(--primary), white 6%);
+  border-color: transparent;
+  background: transparent;
+}
+
+.comparisonTable {
+  display: grid;
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 14%);
+  border-radius: 13px;
+  background: color-mix(in oklch, var(--card), transparent 8%);
+}
+
+.comparisonTable > div {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) repeat(3, minmax(94px, 1fr));
+  min-width: 560px;
+}
+
+.comparisonTable span {
+  min-width: 0;
+  padding: 9px 10px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.comparisonTable span:first-child {
+  color: var(--foreground);
+  font-weight: 760;
+}
+
+.comparisonTable span:last-child {
+  border-right: 0;
+}
+
+.comparisonTable > div:last-child span {
+  border-bottom: 0;
+}
+
+.comparisonHeader span {
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--primary), transparent 89%);
+  font-weight: 780;
+}
+
+.upgradeStatus {
+  margin: 0 14px 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 66%);
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--primary), transparent 91%);
 }
 
 .dialogHeader {
@@ -1551,9 +3185,64 @@
   cursor: pointer;
 }
 
+.authDialog {
+  width: min(540px, 100%);
+  border-color: color-mix(in oklch, var(--primary), transparent 72%);
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--primary), transparent 84%), transparent 42%),
+    color-mix(in oklch, var(--popover), black 5%);
+}
+
+.authMomentumPanel {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 68%);
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--primary), transparent 92%);
+}
+
+.authMomentumPanel > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.authMomentumPanel span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.authMomentumPanel strong {
+  color: var(--foreground);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.authMomentumPanel ul {
+  display: grid;
+  gap: 6px;
+  padding-left: 17px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.authStepRail {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.authStepRail span {
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--primary), transparent 42%);
+}
+
 .authToolButtons {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -1566,6 +3255,27 @@
   border-color: var(--border);
   background: var(--secondary);
   cursor: pointer;
+}
+
+.authToolButtons button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.authDivider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.authDivider::before,
+.authDivider::after {
+  content: "";
+  height: 1px;
+  background: var(--border);
 }
 
 .authSwitch {
@@ -1616,20 +3326,26 @@
 
 .shellCollapsed .sidebar {
   align-items: center;
+  padding-inline: 10px;
 }
 
 .shellCollapsed .sidebarHeader {
   grid-template-columns: 1fr;
+  gap: 8px;
   justify-items: center;
+  width: 100%;
 }
 
 .shellCollapsed .brand {
   justify-content: center;
+  width: 42px;
+  padding: 0;
 }
 
 .shellCollapsed .brand span,
 .shellCollapsed .primaryButton span,
 .shellCollapsed .secondaryButton span,
+.shellCollapsed .upgradeButton span,
 .shellCollapsed .workspacePanel,
 .shellCollapsed .sidebarScroll,
 .shellCollapsed .sidebarFooter span {
@@ -1639,18 +3355,35 @@
   pointer-events: none;
 }
 
-.shellCollapsed .primaryButton,
-.shellCollapsed .secondaryButton,
-.shellCollapsed .sidebarFooter a {
-  width: 42px;
-  padding: 0;
+.shellCollapsed .workspacePanel {
+  display: none;
 }
 
-.shellCollapsed .sidebarFooter {
+.shellCollapsed .primaryButton,
+.shellCollapsed .secondaryButton,
+.shellCollapsed .upgradeButton,
+.shellCollapsed .iconButton,
+.shellCollapsed .sidebarFooter a,
+.shellCollapsed .settingsButton {
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.shellCollapsed .sidebarActions {
+  justify-items: center;
   width: 100%;
 }
 
-.shellCollapsed .sidebarFooter a {
+.shellCollapsed .sidebarFooter {
+  justify-items: center;
+  width: 100%;
+}
+
+.shellCollapsed .sidebarFooter a,
+.shellCollapsed .settingsButton {
   justify-content: center;
 }
 
@@ -1678,17 +3411,36 @@
   }
 }
 
-@keyframes progressSweep {
-  0% {
-    transform: translateX(-105%);
+@keyframes thinkingPulse {
+  0%,
+  100% {
+    opacity: 0.38;
+    transform: translateY(0);
   }
 
-  52% {
-    transform: translateX(75%);
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes thinkingScan {
+  0% {
+    transform: translateX(-100%);
   }
 
   100% {
-    transform: translateX(245%);
+    transform: translateX(230%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .messageEntered,
+  .thinkingRail span,
+  .streamingStatus span,
+  .responseComment,
+  .welcomeLine {
+    animation: none;
   }
 }
 
@@ -1716,10 +3468,7 @@
   .message,
   .composer,
   .limitCard,
-  .attachmentStrip,
-  .error,
-  .documentStatus,
-  .composerMeta {
+  .error {
     width: min(1040px, 100%);
   }
 
@@ -1736,8 +3485,32 @@
   .composerBottom {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
+}
 
-  .shortcutHint {
+@media (max-width: 760px) {
+  .settingsDialog {
+    width: min(560px, 100%);
+  }
+
+  .settingsShell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    height: min(650px, calc(100dvh - 105px));
+  }
+
+  .settingsNav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 20%);
+  }
+
+  .settingsNav button {
+    justify-content: center;
+    padding: 0 8px;
+  }
+
+  .settingsNav button span {
     display: none;
   }
 }
@@ -1748,6 +3521,9 @@
   .shell:not(.shellCollapsed) {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
+    width: 100%;
+    max-width: 100dvw;
+    overflow: hidden;
   }
 
   .sidebar {
@@ -1759,16 +3535,33 @@
     align-items: center;
     gap: 8px;
     width: 100%;
+    max-width: 100dvw;
     height: 64px;
     max-height: none;
     padding: 10px 12px;
     overflow: visible;
     border-right: 0;
-    border-bottom: 1px solid var(--sidebar-border);
+    border-bottom: 1px solid color-mix(in oklch, var(--nav-border), transparent 16%);
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
-      color-mix(in oklch, var(--sidebar), black 2%);
+      var(--nav-surface);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  }
+
+  .sidebar .brand {
+    flex: 0 0 38px;
+    justify-content: center;
+    width: 38px;
+    min-width: 38px;
+    padding: 0;
+  }
+
+  .sidebar .brand span,
+  .sidebar .primaryButton span,
+  .sidebar .secondaryButton span,
+  .sidebar .upgradeButton span,
+  .sidebarFooter span {
+    display: none;
   }
 
   .shell:not(.shellCollapsed) .sidebar {
@@ -1784,7 +3577,7 @@
     max-height: none;
     padding: 12px;
     overflow: hidden;
-    border: 1px solid var(--sidebar-border);
+    border: 1px solid color-mix(in oklch, var(--nav-border), transparent 12%);
     border-radius: 18px;
     box-shadow: 0 24px 72px rgba(0, 0, 0, 0.46);
   }
@@ -1793,16 +3586,36 @@
     flex: 0 0 auto;
     grid-template-columns: 38px 38px;
     gap: 8px;
+    min-width: 0;
     padding-bottom: 0;
     border-bottom: 0;
   }
 
   .sidebarActions {
     display: flex;
+    flex: 0 1 auto;
     align-items: center;
+    justify-content: flex-end;
     gap: 8px;
+    min-width: 0;
+    overflow: hidden;
     margin-left: auto;
     padding: 0;
+  }
+
+  .sidebarActions .primaryButton,
+  .sidebarActions .secondaryButton,
+  .sidebarActions .upgradeButton {
+    flex: 0 0 38px;
+    width: 38px;
+    min-width: 38px;
+    min-height: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .shellCollapsed .sidebarActions {
+    width: auto;
   }
 
   .sidebarScroll {
@@ -1810,6 +3623,8 @@
   }
 
   .sidebarFooter {
+    display: none;
+    flex: 0 0 38px;
     margin-top: 0;
     padding-top: 0;
     border-top: 0;
@@ -1823,31 +3638,37 @@
   .shellCollapsed .brand,
   .shellCollapsed .primaryButton,
   .shellCollapsed .secondaryButton,
+  .shellCollapsed .upgradeButton,
   .shellCollapsed .iconButton,
-  .shellCollapsed .sidebarFooter a {
+  .shellCollapsed .sidebarFooter a,
+  .shellCollapsed .settingsButton {
     width: 38px;
     min-height: 38px;
   }
 
   .shellCollapsed .primaryButton,
   .shellCollapsed .secondaryButton,
-  .shellCollapsed .sidebarFooter a {
+  .shellCollapsed .upgradeButton,
+  .shellCollapsed .sidebarFooter a,
+  .shellCollapsed .settingsButton {
     padding: 0;
   }
 
-  .shellCollapsed .sidebarFooter a {
+  .shellCollapsed .sidebarFooter a,
+  .shellCollapsed .settingsButton {
     justify-content: center;
   }
 
   .shell:not(.shellCollapsed) .sidebarHeader {
     grid-template-columns: minmax(0, 1fr) 38px;
     padding-bottom: 12px;
-    border-bottom: 1px solid var(--sidebar-border);
   }
 
   .shell:not(.shellCollapsed) .brand {
     width: auto;
+    min-width: 0;
     justify-content: flex-start;
+    padding: 0 8px;
   }
 
   .shell:not(.shellCollapsed) .sidebarActions {
@@ -1857,7 +3678,8 @@
   }
 
   .shell:not(.shellCollapsed) .primaryButton,
-  .shell:not(.shellCollapsed) .secondaryButton {
+  .shell:not(.shellCollapsed) .secondaryButton,
+  .shell:not(.shellCollapsed) .upgradeButton {
     width: 100%;
     padding: 0 12px;
   }
@@ -1865,13 +3687,19 @@
   .shell:not(.shellCollapsed) .brand span,
   .shell:not(.shellCollapsed) .primaryButton span,
   .shell:not(.shellCollapsed) .secondaryButton span,
-  .shell:not(.shellCollapsed) .workspacePanel,
-  .shell:not(.shellCollapsed) .sidebarScroll,
+  .shell:not(.shellCollapsed) .upgradeButton span,
   .shell:not(.shellCollapsed) .sidebarFooter span {
+    display: inline;
     width: auto;
     opacity: 1;
     transform: none;
     pointer-events: auto;
+  }
+
+  .shell:not(.shellCollapsed) .brand span,
+  .shell:not(.shellCollapsed) .workspacePanel,
+  .shell:not(.shellCollapsed) .sidebarScroll {
+    display: grid;
   }
 
   .shell:not(.shellCollapsed) .sidebarScroll {
@@ -1882,10 +3710,11 @@
     display: grid;
     margin-top: auto;
     padding-top: 12px;
-    border-top: 1px solid var(--sidebar-border);
+    border-top: 1px solid color-mix(in oklch, var(--nav-border), transparent 18%);
   }
 
-  .shell:not(.shellCollapsed) .sidebarFooter a {
+  .shell:not(.shellCollapsed) .sidebarFooter a,
+  .shell:not(.shellCollapsed) .settingsButton {
     width: 100%;
     justify-content: start;
     padding: 0 10px;
@@ -1895,13 +3724,15 @@
     position: fixed;
     inset: 0;
     z-index: 11;
-    background: rgba(2, 8, 11, 0.55);
+    background: rgba(0, 0, 0, 0.62);
     content: "";
   }
 
   .chat {
     grid-column: 1;
     grid-row: 2;
+    width: 100%;
+    max-width: 100dvw;
     height: 100%;
   }
 
@@ -1915,18 +3746,52 @@
 }
 
 @media (max-width: 640px) {
+  .dialogBackdrop {
+    align-items: stretch;
+    padding: 8px;
+  }
+
+  .dialog,
+  .settingsDialog,
+  .upgradeDialog,
+  .authDialog {
+    width: min(100%, calc(100dvw - 16px));
+    max-height: calc(100dvh - 16px);
+    border-radius: 14px;
+  }
+
   .thread {
-    padding: 18px 14px 270px;
+    padding: 18px 14px 132px;
   }
 
   .emptyState {
-    gap: 14px;
-    min-height: min(620px, 72dvh);
-    padding-top: 10px;
+    align-content: start;
+    gap: 12px;
+    min-height: auto;
+    padding: 0 0 24px;
   }
 
   .emptyState h1 {
-    font-size: 48px;
+    font-size: clamp(30px, 8vw, 38px);
+    line-height: 1.05;
+  }
+
+  .welcomeLine {
+    max-width: 320px;
+    font-size: 14px;
+    line-height: 1.3;
+  }
+
+  .emptyValueRail {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+    gap: 11px;
+    padding: 12px;
+  }
+
+  .emptyValueRail button {
+    justify-content: center;
+    width: 100%;
   }
 
   .heroLead {
@@ -1939,11 +3804,26 @@
   }
 
   .suggestions {
-    grid-template-columns: 1fr;
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
   }
 
   .suggestions button {
-    min-height: 92px;
+    flex: 0 0 min(280px, 82vw);
+    min-height: 76px;
+    padding: 12px;
+  }
+
+  .suggestions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .suggestions p {
+    font-size: 12px;
+    line-height: 1.35;
   }
 
   .message,
@@ -1971,30 +3851,132 @@
 
   .composerWrap {
     bottom: 8px;
+    max-width: 100dvw;
     padding: 0 10px;
   }
 
   .composer {
-    border-radius: 15px;
+    width: 100%;
+    max-width: calc(100dvw - 20px);
+    gap: 4px;
+    padding: 6px;
+    border-radius: 12px;
+  }
+
+  .composerTop textarea {
+    min-height: 30px;
+    max-height: 72px;
+    font-size: 14px;
   }
 
   .composerBottom {
-    grid-template-columns: 1fr auto;
-    align-items: stretch;
+    grid-template-columns: auto minmax(0, 1fr) 34px;
+    align-items: center;
   }
 
-  .composerBottom p {
-    grid-column: 1 / -1;
-    white-space: normal;
+  .modeControl {
+    grid-column: auto;
+    grid-template-columns: repeat(3, minmax(30px, 1fr));
+    width: 100%;
+    min-width: 0;
   }
 
-  .attachButton {
+  .modeControl button {
+    min-width: 0;
+    padding: 0;
+  }
+
+  .settingsGrid,
+  .settingsField {
+    grid-template-columns: 1fr;
+  }
+
+  .settingsPanel {
+    padding: 14px;
+  }
+
+  .upgradeBody {
+    grid-template-columns: 1fr;
+  }
+
+  .upgradePlanGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .upgradeHero {
+    grid-template-columns: 42px minmax(0, 1fr) 34px;
+    padding: 15px;
+  }
+
+  .upgradeHero h2 {
+    font-size: 23px;
+  }
+
+  .upgradeIcon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .settingsSegment {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .settingsInsightPanel {
+    grid-template-columns: 1fr;
+  }
+
+  .settingsInsightGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .promptStarterRow {
+    display: none;
+  }
+
+  .composerTools {
+    grid-column: 1;
     justify-self: start;
+    gap: 4px;
+  }
+
+  .attachButton,
+  .webResearchButton {
+    width: 34px;
+    min-height: 30px;
+    padding: 0;
+  }
+
+  .promptSignal {
+    grid-template-columns: auto minmax(36px, 1fr) auto;
+  }
+
+  .promptSignal > div {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .diagramCanvas svg {
+    min-width: min(360px, 100%);
+  }
+
+  .attachButton span,
+  .webResearchButton span,
+  .modeControl button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .sendButton {
-    min-width: 44px;
-    padding: 0 12px;
+    grid-column: 3;
+    justify-self: end;
+    width: 34px;
+    min-height: 34px;
+    padding: 0;
   }
 
   .limitCard {
@@ -2003,6 +3985,13 @@
 
   .limitCard > div:last-child {
     grid-column: 2;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .limitCard button,
+  .limitCard a {
+    flex: 1 1 auto;
   }
 }
 
@@ -2015,11 +4004,23 @@
   }
 
   .thread {
-    padding: 16px 10px 278px;
+    padding: 16px 10px 132px;
+  }
+
+  .dialogBackdrop {
+    padding: 6px;
+  }
+
+  .dialog,
+  .settingsDialog,
+  .upgradeDialog,
+  .authDialog {
+    width: min(100%, calc(100dvw - 12px));
+    max-height: calc(100dvh - 12px);
   }
 
   .emptyState h1 {
-    font-size: 42px;
+    font-size: 30px;
   }
 
   .heroLead {
@@ -2040,7 +4041,7 @@
 @media (max-height: 560px) and (orientation: landscape) {
   .thread {
     padding-top: 16px;
-    padding-bottom: 230px;
+    padding-bottom: 124px;
   }
 
   .emptyState {

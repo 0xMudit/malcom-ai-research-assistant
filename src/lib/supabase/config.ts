@@ -1,6 +1,9 @@
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const supabaseBackupUrl = process.env.SUPABASE_BACKUP_URL || "";
+const supabaseBackupServiceRoleKey =
+  process.env.SUPABASE_BACKUP_SERVICE_ROLE_KEY || "";
 
 export type SupabasePublicConfig = {
   url: string;
@@ -40,4 +43,15 @@ export function requireSupabaseServiceRoleKey() {
   }
 
   return supabaseServiceRoleKey;
+}
+
+export function getSupabaseBackupAdminConfig() {
+  if (!supabaseBackupUrl || !supabaseBackupServiceRoleKey) {
+    return null;
+  }
+
+  return {
+    url: supabaseBackupUrl,
+    serviceRoleKey: supabaseBackupServiceRoleKey,
+  };
 }

@@ -4,7 +4,7 @@
 
 Malcom combines streamed model responses, web research, document context, persistent workspaces, account management, operational health reporting, and subscription billing in a production-oriented Next.js application.
 
-[Live application](https://malcomman.duckdns.org/malcom/new) · [System status](https://malcomman.duckdns.org/malcom/status) · [Portfolio](https://malcomman.duckdns.org/muditya/)
+[Live application](https://malcom-lake.vercel.app) · [System status](https://malcom-lake.vercel.app/status) · [Portfolio](https://mudityaraghav.vercel.app)
 
 ## Product overview
 
@@ -45,7 +45,7 @@ Malcom is designed to keep useful development paths available when optional infr
 ### Install and run
 
 ```bash
-git clone https://github.com/0xMudit/malcom-ai.git
+git clone https://github.com/0xMudit/malcom-ai-research-assistant.git
 cd malcom-ai
 npm install
 cp .env.example .env.local

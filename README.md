@@ -46,7 +46,7 @@ Malcom is designed to keep useful development paths available when optional infr
 
 ```bash
 git clone https://github.com/0xMudit/malcom-ai-research-assistant.git
-cd malcom-ai
+cd malcom-ai-research-assistant
 npm install
 cp .env.example .env.local
 npm run dev
@@ -120,9 +120,12 @@ supabase/schema.sql     Database schema
 
 ```bash
 npm run lint
+npm test
 npm run build
 npm run smoke
 ```
+
+`npm test` runs the unit suite: request-body validation, rate-limit window behaviour, response-mode parsing, and LLM configuration.
 
 `npm run smoke` checks the public pages, health endpoint, and expected chat API error handling. Run it against a started production instance.
 
